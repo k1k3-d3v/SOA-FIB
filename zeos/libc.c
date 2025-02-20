@@ -6,6 +6,7 @@
 
 #include <types.h>
 
+
 int errno;
 
 void itoa(int a, char *b)
@@ -42,4 +43,5 @@ int strlen(char *a)
   
   return i;
 }
+
 

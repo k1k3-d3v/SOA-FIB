@@ -62,7 +62,7 @@
 		popl %ds; \
 		popl %es; \
 		popl %fs; \
-		popl %gs; \
+		popl %gs;
 
 #define EOI	 \
 movb $0x20, %al ; \
@@ -80,5 +80,12 @@ ENTRY(clock_handler)
 	SAVE_ALL
 	EOI
 	call clock_routine;
+	RESTORE_ALL
+	iret;
+
+ENTRY(pf_handler)
+	SAVE_ALL
+	EOI
+	call pf_routine
 	RESTORE_ALL
 	iret;

@@ -14,6 +14,7 @@ Register    idtR;
 
 extern void keyboard_handler();
 extern void clock_handler();
+extern void pf_handler();
 
 char char_map[] =
 {
@@ -27,7 +28,7 @@ char char_map[] =
   '\0','\0','\0','\0','\0','\0','\0','\0',
   '\0','\0','\0','\0','\0','\0','\0','7',
   '8','9','-','4','5','6','+','1',
-  '2','3','0','\0','\0','\0','<','Æ\0',
+  '2','3','0','\0','\0','\0','<','\0',
   '\0','\0','\0','\0','\0','\0','\0','\0',
   '\0','\0'
 };
@@ -65,7 +66,7 @@ void setTrapHandler(int vector, void (*handler)(), int maxAccessibleFromPL)
   /***********************************************************************/
   Word flags = (Word)(maxAccessibleFromPL << 13);
 
-  //flags |= 0x8F00;    /* P = 1, D = 1, Type = 1111 (Trap Gate) */
+  //flags |= 0x8F00;    /* P = 1, D = 1, Type = 1111 (Trap Gate)*/
   /* Changed to 0x8e00 to convert it to an 'interrupt gate' and so
      the system calls will be thread-safe. */
   flags |= 0x8E00;    /* P = 1, D = 1, Type = 1110 (Interrupt Gate) */
@@ -86,6 +87,8 @@ void setIdt()
   /* ADD INITIALIZATION CODE FOR INTERRUPT VECTOR */
   setInterruptHandler(33, keyboard_handler, 0);
   setInterruptHandler(32, clock_handler, 0);
+  setInterruptHandler(14, pf_handler, 3);
+  //setTrapHandler(0x80, system_call, 3);
 
   set_idt_reg(&idtR);
 }
@@ -108,4 +111,44 @@ void keyboard_routine()
 void clock_routine()
 {
   zeos_show_clock();
+}
+
+void atoi_sys(int a, char *b)
+{
+  int i, i1;
+  char c;
+
+  if (a==0) { b[0]='0'; b[1]=0; return ;}
+
+  i=0;
+  while (a>0)
+  {
+    b[i]=(a%10)+'0';
+    a=a/10;
+    i++;
+  }
+
+  for (i1=0; i1<i/2; i1++)
+  {
+    c=b[i1];
+    b[i1]=b[i-i1-1];
+    b[i-i1-1]=c;
+  }
+  b[i]=0;
+}
+
+void pf_routine(int error, int address)
+{
+  char message[] = "Process generates a PAGE FAULT exception at EIP: ";
+  char space[] = "\n";
+  char number[12];
+
+  atoi_sys(address, number);
+
+  printk(space);
+  printk(message);
+  printk(number);
+  printk(space);
+
+  while(1);
 }
