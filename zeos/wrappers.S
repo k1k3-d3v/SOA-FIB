@@ -1,3 +1,3 @@
 #include <asm.h>
 
-ENTRY(write)
+ENTRY(gettime)
