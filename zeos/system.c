@@ -19,6 +19,8 @@ unsigned int *p_sys_size = (unsigned int *) KERNEL_START;
 unsigned int *p_usr_size = (unsigned int *) KERNEL_START+1;
 unsigned int *p_rdtr = (unsigned int *) KERNEL_START+2;
 
+void printk_color(const char *msg, int color);
+
 /************************/
 /** Auxiliar functions **/
 /************************/
@@ -73,7 +75,7 @@ set_seg_regs(__KERNEL_DS, __KERNEL_DS, (DWord) &task[4]);
 /*** DO *NOT* ADD ANY CODE IN THIS ROUTINE BEFORE THIS POINT ***/
 
 printk("Kernel Loaded!    ");
-printk_color("12.EI      ", 0x0E);
+printk_color("Iago y Enrique G.12     ", 0x0E);
 
 
   /* Initialize hardware data */
