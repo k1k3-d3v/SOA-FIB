@@ -4,6 +4,7 @@
 
 #include <asm.h>
 #include <segment.h>
+#include <errno.h>
 
 
 /**************************************************/
@@ -71,24 +72,20 @@ outb %al, $0x20 ;
 
 ENTRY(keyboard_handler)
 	SAVE_ALL
-	EOI
 	call keyboard_routine
+	EOI
 	RESTORE_ALL
-	iret;
+	iret
 
 ENTRY(clock_handler)
 	SAVE_ALL
 	EOI
 	call clock_routine
 	RESTORE_ALL
-	iret;
+	iret
 
 ENTRY(pf_handler)
-	SAVE_ALL
-	EOI
 	call pf_routine
-	RESTORE_ALL
-	iret;
 
 ENTRY(system_call_handler)
 	SAVE_ALL 							// Save the current context
@@ -103,4 +100,37 @@ err:
 fin:
 	movl %EAX, 0x18(%esp) 				// Change the EAX value in the stack
 	RESTORE_ALL 						// Restore the context
-	iret;
+	iret
+
+ENTRY(writeMSR)
+	pushl %ebp
+	movl %esp, %ebp
+
+	pushl %ecx
+	pushl %eax
+	pushl %edx
+
+	movl 8(%ebp), %ecx
+	movl 12(%ebp), %eax
+	movl 16(%ebp), %edx
+	wrmsr
+
+	popl %edx
+	popl %eax
+	popl %ecx
+
+	movl %ebp, %esp
+	popl %ebp
+	ret
+
+
+
+
+
+
+
+
+
+
+
+

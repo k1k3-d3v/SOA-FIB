@@ -6,7 +6,6 @@
 #include <segment.h>
 #include <hardware.h>
 #include <io.h>
-
 #include <zeos_interrupt.h>
 
 Gate idt[IDT_ENTRIES];
@@ -15,6 +14,10 @@ Register    idtR;
 extern void keyboard_handler();
 extern void clock_handler();
 extern void pf_handler();
+extern void system_call_handler();
+extern void writeMSR(unsigned long msr, unsigned long val);
+
+int zeos_ticks = 0;
 
 char char_map[] =
 {
@@ -88,7 +91,11 @@ void setIdt()
   setInterruptHandler(33, keyboard_handler, 0);
   setInterruptHandler(32, clock_handler, 0);
   setInterruptHandler(14, pf_handler, 3);
-  setTrapHandler(0x80, system_call_handler, 3);
+
+  //Inicialización registros MSR
+  writeMSR(0x174, __KERNEL_CS);
+  writeMSR(0x175, INITIAL_ESP);
+  writeMSR(0x176, (unsigned long)system_call_handler);
 
   set_idt_reg(&idtR);
 }
@@ -101,7 +108,6 @@ void keyboard_routine()
 
   if (is_make <= 0) {
     char c = char_map[code];
-
     if (total_code >= sizeof(char_map) || c == '\0') c = 'C';
 
     printc_xy(0x00, 0x00, c); //Mostrar caracter en la zona superior izquierda
@@ -110,6 +116,7 @@ void keyboard_routine()
 
 void clock_routine()
 {
+  ++zeos_ticks;
   zeos_show_clock();
 }
 
