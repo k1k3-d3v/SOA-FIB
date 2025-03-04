@@ -16,18 +16,21 @@ ENTRY(gettime)
     sysenter
 
 return:
+    popl %ebp
+    addl $4, %esp
+    popl %edx
+    popl %ecx
+
     cmpl $0, %eax
     jl eaxNegative
     jmp final
 
 eaxNegative:
-    neg %eax
+    negl %eax
     movl %eax, errno
     movl $-1, %eax
 
 final:
-    popl %ebp
-    popl %edx
-    popl %ecx
+    movl %ebp, %esp
     popl %ebp
     ret

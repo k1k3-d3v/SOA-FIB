@@ -14,7 +14,7 @@ Register    idtR;
 extern void keyboard_handler();
 extern void clock_handler();
 extern void pf_handler();
-extern void system_call_handler();
+extern void syscall_handler_sysenter();
 extern void writeMSR(unsigned long msr, unsigned long val);
 
 int zeos_ticks = 0;
@@ -95,7 +95,7 @@ void setIdt()
   //Inicialización registros MSR
   writeMSR(0x174, __KERNEL_CS);
   writeMSR(0x175, INITIAL_ESP);
-  writeMSR(0x176, (unsigned long)system_call_handler);
+  writeMSR(0x176, (unsigned long)syscall_handler_sysenter);
 
   set_idt_reg(&idtR);
 }
