@@ -18,6 +18,6 @@ int __attribute__ ((__section__(".text.main")))
    int var = addASM(0x42, 0x666);
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
    gettime();
-
-  while(1) { }
+   
+   while(1) { }
 }

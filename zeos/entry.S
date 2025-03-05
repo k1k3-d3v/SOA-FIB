@@ -112,8 +112,6 @@ sysenter_fin:
 	sti
 	sysexit	
 
-
-
 ENTRY(writeMSR)
 	pushl %ebp
 	movl %esp, %ebp
@@ -127,11 +125,3 @@ ENTRY(writeMSR)
 	movl %ebp, %esp
 	popl %ebp
 	ret
-
-
-
-
-
-
-
-

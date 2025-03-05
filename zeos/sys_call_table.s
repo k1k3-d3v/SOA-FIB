@@ -14,7 +14,7 @@
  .long sys_ni_syscall
  .long sys_ni_syscall
  .long sys_ni_syscall
- .long sys_ni_syscall
+ .long sys_write
  .long sys_ni_syscall
  .long sys_ni_syscall
  .long sys_ni_syscall
