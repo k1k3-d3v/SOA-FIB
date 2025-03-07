@@ -5,6 +5,7 @@ extern int addASM(int a, int b);
 char buff[24];
 
 int pid;
+char array[100];
 
 int add(int par1, int par2) {
 	return par1 + par2;
@@ -17,7 +18,6 @@ int __attribute__ ((__section__(".text.main")))
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
    int var = addASM(0x42, 0x666);
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
-   gettime();
-   
+
    while(1) { }
 }

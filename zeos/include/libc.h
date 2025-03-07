@@ -16,6 +16,10 @@ int gettime();
 
 int strlen(char *a);
 
+void perror();
+
+void zeos_strcpy(char *dest, const char *src);
+
 int getpid();
 
 int fork();

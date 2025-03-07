@@ -13,6 +13,8 @@
 
 #include <sched.h>
 
+#include <errno.h>
+
 #define LECTURA 0
 #define ESCRIPTURA 1
 #define BLOCK 128
@@ -62,10 +64,15 @@ int sys_write(int fd, char *buffer, int size)
   if(error_fd < 0) return error_fd;
 
   if (buffer == NULL) {
-    return -1; // Cómo sabemos el código del error?
+    return -EFAULT;
   }
-  if (size <= 0) {
-    return -1; // Cómo sabemos el código del error=
+
+  if (size < 0) {
+    return -EINVAL;
+  }
+
+  if (access_ok(VERIFY_READ, buffer, size) == 0) {
+    return -EFAULT;
   }
 
   int bytes = size;
@@ -83,13 +90,13 @@ int sys_write(int fd, char *buffer, int size)
       }
 
       if (copy_from_user(buffer + offset, buff, current_size) != 0) {
-          return -1;  // Si ocurre un error al copiar, devolvemos un error
+          return -EFAULT;  // Si ocurre un error al copiar, devolvemos un error
       }
 
       // Escribir en consola
-      w_bytes = sys_write_console(buff, BLOCK);
+      w_bytes = sys_write_console(buff, current_size);
       if (w_bytes < 0) {
-          return w_bytes;  
+          return -EIO;
       }
 
       offset += current_size;

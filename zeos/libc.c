@@ -3,8 +3,8 @@
  */
 
 #include <libc.h>
-
 #include <types.h>
+#include <errno.h>
 
 
 int errno;
@@ -43,5 +43,51 @@ int strlen(char *a)
   
   return i;
 }
+
+void zeos_strcpy(char *dest, const char *src) {
+    while (*src) {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+
+    *dest = '\0';
+}
+
+
+void perror() {
+    char buff[256];
+
+    switch(errno) {
+        case 0: // No error
+            zeos_strcpy(buff, "\nNo error\n");
+            break;
+        case EIO:
+            zeos_strcpy(buff, "\nInput/output error\n");
+            break;
+        case EBADF:
+            zeos_strcpy(buff, "\nBad file descriptor\n");
+            break;
+        case EACCES:
+            zeos_strcpy(buff, "\nPermission denied\n");
+            break;
+        case ENOSYS:
+            zeos_strcpy(buff, "\nFunction not implemented\n");
+            break;
+        case EINVAL:
+            zeos_strcpy(buff, "\nInvalid argument\n");
+            break;
+        case EFAULT:
+            zeos_strcpy(buff, "\nBad address\n");
+            break;
+
+    }
+
+    write(1, buff, strlen(buff));
+}
+
+
+
+
 
 
