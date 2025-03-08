@@ -15,18 +15,19 @@ extern void keyboard_handler();
 extern void clock_handler();
 extern void pf_handler();
 extern void syscall_handler_sysenter();
-extern void writeMSR(unsigned long msr, unsigned long val);
+
+void writeMSR(unsigned long msr, unsigned long val);
 
 int zeos_ticks = 0;
 
 char char_map[] =
 {
   '\0','\0','1','2','3','4','5','6',
-  '7','8','9','0','\'','¡','\0','\0',
+  '7','8','9','0','\'','ï¿½','\0','\0',
   'q','w','e','r','t','y','u','i',
   'o','p','`','+','\0','\0','a','s',
-  'd','f','g','h','j','k','l','ñ',
-  '\0','º','\0','ç','z','x','c','v',
+  'd','f','g','h','j','k','l','ï¿½',
+  '\0','ï¿½','\0','ï¿½','z','x','c','v',
   'b','n','m',',','.','-','\0','*',
   '\0','\0','\0','\0','\0','\0','\0','\0',
   '\0','\0','\0','\0','\0','\0','\0','7',
@@ -92,7 +93,7 @@ void setIdt()
   setInterruptHandler(32, clock_handler, 0);
   setInterruptHandler(14, pf_handler, 3);
 
-  //Inicialización registros MSR
+  //Inicializaciï¿½n registros MSR
   writeMSR(0x174, __KERNEL_CS);
   writeMSR(0x175, INITIAL_ESP);
   writeMSR(0x176, (unsigned long)syscall_handler_sysenter);

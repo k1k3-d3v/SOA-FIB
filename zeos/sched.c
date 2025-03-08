@@ -5,18 +5,30 @@
 #include <sched.h>
 #include <mm.h>
 #include <io.h>
+#include <interrupt.h>
+
+
+union task_union * idle_task_union;
+
+struct task_struct * idle_task;
+
+
 
 union task_union task[NR_TASKS]
   __attribute__((__section__(".data.task")));
 
-#if 0
+
+
 struct task_struct *list_head_to_task_struct(struct list_head *l)
 {
-  return list_entry( l, struct task_struct, list);
+	return(struct sched_task_struct*)((int)l&0xfffff000);
 }
-#endif
+
 
 extern struct list_head blocked;
+
+struct list_head ready_queue;
+struct list_head free_queue;
 
 
 /* get_DIR - Returns the Page Directory address for task 't' */
@@ -55,16 +67,49 @@ void cpu_idle(void)
 
 void init_idle (void)
 {
+	struct list_head *e = list_first(&free_queue); // obtiene el primer elemento de la free_queue
+	list_del(e); // elimina el primer elemento de la freequeue
+	idle_task = list_head_to_task_struct(e); // obtiene el task_struct del elemento eliminado (LA PRIMERA DIRECCIÓN)
+	idle_task_union = (union task_union*)idle_task; // obtiene el task_union del task_struct
+	idle_task->PID = 0; // asigna el PID 0 al idle_task 
+	allocate_DIR(idle_task);// asigna la dirección de la tabla de páginas al idle_task
+	
+	idle_task_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long) cpu_idle;//ret
+	idle_task_union->stack[KERNEL_STACK_SIZE-2] = (unsigned long)0; //ebp
+
+	idle_task->kernel_esp = (unsigned long) &(idle_task_union->stack[KERNEL_STACK_SIZE-2]);
 
 }
 
 void init_task1(void)
 {
+	/*
+	*/
+
+	struct list_head *e = list_first(&free_queue); // obtiene el primer elemento de la free_queue
+	list_del(e); // elimina el primer elemento de la freequeue
+	struct task_struct * init_task = list_head_to_task_struct(e); // obtiene el task_struct del elemento eliminado (LA PRIMERA DIRECCIÓN)
+	union task_union* init_task_union = (union task_union*)init_task; // obtiene el task_union del task_struct
+	idle_task->PID = 1; // asigna el PID 0 al idle_task 
+	allocate_DIR(init_task);// asigna la dirección de la tabla de páginas al idle_task
+	set_user_pages(init_task);
+
+	tss.esp0 = &(init_task_union->stack[KERNEL_STACK_SIZE]);
+	writeMSR(0x175, &(init_task_union->stack[KERNEL_STACK_SIZE]));
+	set_cr3(init_task->dir_pages_baseAddr);
+		
 }
 
 
 void init_sched()
 {
+	INIT_LIST_HEAD(&ready_queue);
+	INIT_LIST_HEAD(&free_queue);
+
+	for (int i = 0; i < NR_TASKS; i++)
+	{
+		list_add(&task[i].task.list, &free_queue);
+	}
 
 }
 
