@@ -85,8 +85,8 @@ void init_task1(void)
 	allocate_DIR(init_task);
 
 	set_user_pages(init_task);
-	tss.esp0 = &init_task_union->stack[KERNEL_STACK_SIZE];
-	writeMSR(0x175, &init_task_union->stack[KERNEL_STACK_SIZE]);
+	tss.esp0 = (long unsigned int)&init_task_union->stack[KERNEL_STACK_SIZE]; //Pasar de puntero a entero
+	writeMSR(0x175, (long unsigned int)&init_task_union->stack[KERNEL_STACK_SIZE]); //Pasar de puntero a entero
 	set_cr3(init_task->dir_pages_baseAddr);
 }
 
