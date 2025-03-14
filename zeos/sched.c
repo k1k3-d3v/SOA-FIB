@@ -1,23 +1,28 @@
 /*
- * sched.c - initializes struct for task 0 anda task 1
- */
+* sched.c - initializes struct for task 0 anda task 1
+*/
 
 #include <sched.h>
 #include <mm.h>
 #include <io.h>
+#include <interrupt.h>
+
+
+struct task_struct * idle_task;
+union task_union * idle_task_union;
 
 union task_union task[NR_TASKS]
   __attribute__((__section__(".data.task")));
 
-#if 0
 struct task_struct *list_head_to_task_struct(struct list_head *l)
 {
-  return list_entry( l, struct task_struct, list);
+//return list_entry( l, struct task_struct, list);
+  return (struct task_struct*)((int)l&0xfffff000);
 }
-#endif
 
 extern struct list_head blocked;
-
+struct list_head ready_queue;
+struct list_head free_queue;
 
 /* get_DIR - Returns the Page Directory address for task 't' */
 page_table_entry * get_DIR (struct task_struct *t) 
@@ -55,16 +60,45 @@ void cpu_idle(void)
 
 void init_idle (void)
 {
+	struct list_head * e = list_first(&free_queue);
+	list_del(e);
+	idle_task = list_head_to_task_struct(e);
+	idle_task_union = (union task_union*)idle_task;
 
+	idle_task->PID = 0;
+	allocate_DIR(idle_task);
+
+	idle_task_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long) cpu_idle;
+	idle_task_union->stack[KERNEL_STACK_SIZE-2] = (unsigned long) 0;
+
+	idle_task->kernel_esp = (unsigned long) &idle_task_union->stack[KERNEL_STACK_SIZE-2];
 }
 
 void init_task1(void)
 {
+	struct list_head * e1 = list_first(&free_queue);
+	list_del(e1);
+	struct task_struct * init_task = list_head_to_task_struct(e1);
+	union task_union * init_task_union = (union task_union*)init_task;
+
+	init_task->PID = 1;
+	allocate_DIR(init_task);
+
+	set_user_pages(init_task);
+	tss.esp0 = &init_task_union->stack[KERNEL_STACK_SIZE];
+	writeMSR(0x175, &init_task_union->stack[KERNEL_STACK_SIZE]);
+	set_cr3(init_task->dir_pages_baseAddr);
 }
 
 
 void init_sched()
 {
+	INIT_LIST_HEAD(&ready_queue);
+	INIT_LIST_HEAD(&free_queue);
+
+	for (int i = 0; i < NR_TASKS; ++i) {
+		list_add(&task[i].task.list, &free_queue);
+	}
 
 }
 
