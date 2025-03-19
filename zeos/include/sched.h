@@ -44,6 +44,12 @@ struct task_struct * current();
 
 void task_switch(union task_union*t);
 
+void inner_task_switch(union task_union*t);  //NUEVA CABECERA INNER TASK SWITCH
+
+unsigned int get_ebp();
+
+void stack_change(unsigned int new_esp);
+
 struct task_struct *list_head_to_task_struct(struct list_head *l);
 
 int allocate_DIR(struct task_struct *t);

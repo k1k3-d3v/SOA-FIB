@@ -36,7 +36,6 @@ page_table_entry * get_PT (struct task_struct *t)
 	return (page_table_entry *)(((unsigned int)(t->dir_pages_baseAddr->bits.pbase_addr))<<12);
 }
 
-
 int allocate_DIR(struct task_struct *t) 
 {
 	int pos;
@@ -85,11 +84,10 @@ void init_task1(void)
 	allocate_DIR(init_task);
 
 	set_user_pages(init_task);
-	tss.esp0 = (long unsigned int)&init_task_union->stack[KERNEL_STACK_SIZE]; //Pasar de puntero a entero
-	writeMSR(0x175, (long unsigned int)&init_task_union->stack[KERNEL_STACK_SIZE]); //Pasar de puntero a entero
+	tss.esp0 = (unsigned long)&init_task_union->stack[KERNEL_STACK_SIZE];			//Pasar de puntero a entero
+	writeMSR(0x175, (unsigned long)&init_task_union->stack[KERNEL_STACK_SIZE]); 	//Pasar de puntero a entero
 	set_cr3(init_task->dir_pages_baseAddr);
 }
-
 
 void init_sched()
 {
@@ -113,3 +111,12 @@ struct task_struct* current()
   return (struct task_struct*)(ret_value&0xfffff000);
 }
 
+void inner_task_switch(union task_union *new) {
+	tss.esp0 = (unsigned long)&new->stack[KERNEL_STACK_SIZE];
+	writeMSR(0x175, (unsigned long)&new->stack[KERNEL_STACK_SIZE]);
+
+	set_cr3(new->task.dir_pages_baseAddr);
+
+	current()->kernel_esp = get_ebp();
+	stack_change((unsigned int)new->task.kernel_esp);
+}
