@@ -15,6 +15,7 @@
 
 #include <errno.h>
 
+#include <list.h>
 #define LECTURA 0
 #define ESCRIPTURA 1
 #define BLOCK 128
@@ -22,6 +23,8 @@
 char buff[128];
 
 extern int zeos_ticks;
+
+extern struct list_head free_queue;
 
 int check_fd(int fd, int permissions)
 {
@@ -45,7 +48,27 @@ int sys_fork()
   int PID=-1;
 
   // creates the child process
+  if (list_first( &free_queue)  == NULL) {
+    return -1;
+  }
+
+  copy_data(current()-);
+
+  struct list_head * e1 = list_first(&free_queue);
+  list_del(e1);
+  copy_data(current()->)
+      
+  init_task = list_head_to_task_struct(e1);
+  init_task_union = (union task_union*)init_task;
   
+  init_task->PID = 1;
+  allocate_DIR(init_task);
+  
+  set_user_pages(init_task);
+  tss.esp0 = (unsigned long)&init_task_union->stack[KERNEL_STACK_SIZE];			//Pasar de puntero a entero
+  writeMSR(0x175, (unsigned long)&init_task_union->stack[KERNEL_STACK_SIZE]); 	//Pasar de puntero a entero
+  set_cr3(init_task->dir_pages_baseAddr);
+    
   return PID;
 }
 

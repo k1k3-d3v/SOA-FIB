@@ -25,7 +25,7 @@ ENTRY(task_switch)
 ENTRY(get_ebp)
     movl %ebp, %eax
     ret
-
+    
 ENTRY(stack_change)
     movl 4(%esp), %esp
     popl %ebp

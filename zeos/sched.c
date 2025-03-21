@@ -11,6 +11,10 @@
 struct task_struct * idle_task;
 union task_union * idle_task_union;
 
+struct task_struct * init_task;
+union task_union * init_task_union;
+
+
 union task_union task[NR_TASKS]
   __attribute__((__section__(".data.task")));
 
@@ -53,6 +57,8 @@ void cpu_idle(void)
 
 	while(1)
 	{
+	printk("Soy Idlefonso\n");
+
 	;
 	}
 }
@@ -77,8 +83,8 @@ void init_task1(void)
 {
 	struct list_head * e1 = list_first(&free_queue);
 	list_del(e1);
-	struct task_struct * init_task = list_head_to_task_struct(e1);
-	union task_union * init_task_union = (union task_union*)init_task;
+	init_task = list_head_to_task_struct(e1);
+	init_task_union = (union task_union*)init_task;
 
 	init_task->PID = 1;
 	allocate_DIR(init_task);

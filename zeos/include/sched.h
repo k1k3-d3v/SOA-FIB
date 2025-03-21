@@ -12,6 +12,12 @@
 #define NR_TASKS      10
 #define KERNEL_STACK_SIZE	1024
 
+extern struct task_struct * idle_task;
+extern union task_union * idle_task_union;
+
+extern struct task_struct * init_task;
+extern union task_union * init_task_union;
+
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 
 struct task_struct {

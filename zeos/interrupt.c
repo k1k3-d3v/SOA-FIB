@@ -7,6 +7,7 @@
 #include <hardware.h>
 #include <io.h>
 #include <zeos_interrupt.h>
+#include <sched.h>
 
 Gate idt[IDT_ENTRIES];
 Register    idtR;
