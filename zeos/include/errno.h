@@ -7,6 +7,7 @@
 #define ENOSYS  78
 #define EINVAL  22
 #define EFAULT 14
+#define ENOMEM 12
 
 
 #endif /* _ERRNO_H */

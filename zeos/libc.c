@@ -80,7 +80,9 @@ void perror() {
         case EFAULT:
             zeos_strcpy(buff, "\nBad address\n");
             break;
-
+        case ENOMEM:
+            zeos_strcpy(buff, "\nOut of memory\n");
+            break;
     }
 
     write(1, buff, strlen(buff));

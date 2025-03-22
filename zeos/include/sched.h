@@ -25,6 +25,7 @@ struct task_struct {
   page_table_entry * dir_pages_baseAddr;
   struct list_head list;
   unsigned long kernel_esp;
+  enum state_t state;
 };
 
 union task_union {
@@ -52,7 +53,7 @@ void task_switch(union task_union*t);
 
 void inner_task_switch(union task_union*t);  //NUEVA CABECERA INNER TASK SWITCH
 
-unsigned int get_ebp();
+extern unsigned int get_ebp();
 
 void stack_change(unsigned int new_esp);
 

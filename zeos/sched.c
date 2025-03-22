@@ -14,6 +14,10 @@ union task_union * idle_task_union;
 struct task_struct * init_task;
 union task_union * init_task_union;
 
+extern struct list_head blocked;
+struct list_head ready_queue;
+struct list_head free_queue;
+
 
 union task_union task[NR_TASKS]
   __attribute__((__section__(".data.task")));
@@ -23,10 +27,6 @@ struct task_struct *list_head_to_task_struct(struct list_head *l)
 //return list_entry( l, struct task_struct, list);
   return (struct task_struct*)((int)l&0xfffff000);
 }
-
-extern struct list_head blocked;
-struct list_head ready_queue;
-struct list_head free_queue;
 
 /* get_DIR - Returns the Page Directory address for task 't' */
 page_table_entry * get_DIR (struct task_struct *t) 
@@ -57,8 +57,6 @@ void cpu_idle(void)
 
 	while(1)
 	{
-	printk("Soy Idlefonso\n");
-
 	;
 	}
 }
