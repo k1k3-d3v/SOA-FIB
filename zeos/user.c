@@ -18,6 +18,18 @@ int __attribute__ ((__section__(".text.main")))
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
    int var = addASM(0x42, 0x666);
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
+
+   int pid = fork();
+   if (pid == 0) {
+     // Proceso hijo
+     write(1, "Este es el proceso hijo\n", 25);
+   } else if (pid > 0) {
+     // Proceso padre
+     write(1, "Este es el proceso padre\n", 26);
+   } else {
+     // Fallo en fork
+     write(1, "Fallo en fork\n", 14);
+   }
    
    while(1) {}
 }

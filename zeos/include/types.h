@@ -60,11 +60,6 @@ typedef struct              /* TASK STATE SEGMENT      */
   DWord ebp;                /* 60 |                    */
   DWord esi;                /* 64 |                    */
   DWord edi;                /* 68 |- Saved registers   */
-  DWord ebx;                /* 52 |                    */
-  DWord esp;                /* 56 |                    */
-  DWord ebp;                /* 60 |                    */
-  DWord esi;                /* 64 |                    */
-  DWord edi;                /* 68 |- Saved registers   */
   Word  es;                 /* 72 |                    */
   Word  none5;              /*    |                    */
   Word  cs;                 /* 76 |                    */

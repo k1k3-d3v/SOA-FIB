@@ -48,6 +48,11 @@ int sys_getpid()
 	return current()->PID;
 }
 
+int ret_from_fork()
+{
+  return 0;
+}
+
 int sys_fork()
 {
   //Comprobar si hay espacio en la cola de procesos libres
@@ -103,7 +108,7 @@ int sys_fork()
   for(int i = NUM_PAG_KERNEL + NUM_PAG_CODE; i<NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i++) {
     set_ss_pag(parent_PT, i + NUM_PAG_DATA, get_frame(child_PT, i)); //Asignamos la pagina fisica del hijo al padre
     copy_data((void*)(i << 12), (void*)((i + NUM_PAG_DATA) << 12), PAGE_SIZE); //Convertimos el número de página a dirección física
-    del_ss_pag(parent_PT, i + NUM_PAG_DATA); //Eliminamos la página temporal creada en el padre
+    del_ss_pag(parent_PT, i + NUM_PAG_DATA);  //Eliminamos la página temporal creada en el padre
   }
 
   set_cr3(get_DIR(current())); //Forzamos un flush de la TLB para eliminar los accesos del padre a las páginas del hijo
@@ -112,17 +117,18 @@ int sys_fork()
   child_struct->PID = PID_global++;
 
   //h) Inicializar campos task_struct del hijo
-  unsigned int ebp = get_ebp();
-  ebp = ebp - (unsigned int)current() + (unsigned int)child_union;
-  child_struct->kernel_esp = ebp + sizeof(DWord);
-
-  //j) Añadir hijo a la cola de listos y establecerlo en READY
   child_struct->state = ST_READY; //Poner proceso en estado ready
+
+  //i) Preparar la pila del hijo para task_switch
+  child_union->stack[KERNEL_STACK_SIZE - 18] = (unsigned long)&ret_from_fork; //Establecemos la dirección de retorno de la función fork
+  child_union->stack[KERNEL_STACK_SIZE - 19] = 0; //Establecemos el fake_ebp en 0
+  child_struct->kernel_esp = (unsigned long)&(child_union->stack[KERNEL_STACK_SIZE - 19]); //Hacemos que kernel_esp apunte al tope de la pila
+
+  //j) Añadir hijo a la cola de listos
   list_add_tail(&child_struct->list, &ready_queue);
 
   //k) Devolver PID del hijo
   return child_struct->PID;
-
 }
 
 void sys_exit()
