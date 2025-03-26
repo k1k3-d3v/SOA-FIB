@@ -9,6 +9,7 @@
 #include <zeos_interrupt.h>
 #include <sched.h>
 
+
 Gate idt[IDT_ENTRIES];
 Register    idtR;
 
@@ -90,9 +91,9 @@ void setIdt()
   /* ADD INITIALIZATION CODE FOR INTERRUPT VECTOR */
   setInterruptHandler(33, keyboard_handler, 0);
   setInterruptHandler(32, clock_handler, 0);
-  setInterruptHandler(14, pf_handler, 3);
+  setInterruptHandler(14, pf_handler, 0);
 
-  //Inicializaci�n registros MSR
+  //Inicializacion registros MSR
   writeMSR(0x174, __KERNEL_CS);
   writeMSR(0x175, INITIAL_ESP);
   writeMSR(0x176, (unsigned long)syscall_handler_sysenter);
@@ -118,42 +119,57 @@ void clock_routine()
 {
   ++zeos_ticks;
   zeos_show_clock();
+  /*
+  if (zeos_ticks % 10 == 0) {
+    if(current()->PID == 1000) {
+      printk("Soy el alcalde\n");
+      task_switch();
+    }
+    else {
+      printk("Soy el hijo del alcalde\n");
+      task_switch();
+    }
+  }
+  */
 }
 
-void atoi_sys(int a, char *b)
+void itoh_sys(int a, char *b) //Funcion para pasar de int a hex(char)
 {
   int i, i1;
   char c;
+  char hex_digits[] = "0123456789ABCDEF";
 
-  if (a==0) { b[0]='0'; b[1]=0; return ;}
+  if (a == 0) { b[0] = '0'; b[1] = 0; return; }
 
-  i=0;
-  while (a>0)
+  i = 0;
+  while (a > 0)
   {
-    b[i]=(a%10)+'0';
-    a=a/10;
+    b[i] = hex_digits[a % 16];
+    a = a / 16;
     i++;
   }
 
-  for (i1=0; i1<i/2; i1++)
+  for (i1 = 0; i1 < i / 2; i1++)
   {
-    c=b[i1];
-    b[i1]=b[i-i1-1];
-    b[i-i1-1]=c;
+    c = b[i1];
+    b[i1] = b[i - i1 - 1];
+    b[i - i1 - 1] = c;
   }
-  b[i]=0;
+  b[i] = 0;
 }
 
 void pf_routine(int error, int address)
 {
   char message[] = "Process generates a PAGE FAULT exception at EIP: ";
   char space[] = "\n";
-  char number[12];
+  char prefix[] = "0x";
+  char number[20];
 
-  atoi_sys(address, number);
+  itoh_sys(address, number);
 
   printk(space);
   printk(message);
+  printk(prefix);
   printk(number);
   printk(space);
 

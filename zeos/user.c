@@ -18,7 +18,8 @@ int __attribute__ ((__section__(".text.main")))
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
    int var = addASM(0x42, 0x666);
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
-
+   
+  /*TEST FORK
    int pid = fork();
    if (pid == 0) {
      // Proceso hijo
@@ -30,6 +31,12 @@ int __attribute__ ((__section__(".text.main")))
      // Fallo en fork
      write(1, "Fallo en fork\n", 14);
    }
-   
+  */
+
+  /*TEST PAGE_FAULT 
+  int *p = 0x0;
+  *p = 0;
+  */
+ 
    while(1) {}
 }
