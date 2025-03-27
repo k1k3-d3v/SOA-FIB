@@ -25,7 +25,7 @@ struct task_struct {
   page_table_entry * dir_pages_baseAddr;
   struct list_head list;
   unsigned long kernel_esp;
-  enum state_t state;
+  int quantum;
 };
 
 union task_union {
@@ -70,5 +70,6 @@ void sched_next_rr();
 void update_process_state_rr(struct task_struct *t, struct list_head *dest);
 int needs_sched_rr();
 void update_sched_data_rr();
+void schedule(struct task_struct *t, struct list_head *dest);
 
 #endif  /* __SCHED_H__ */

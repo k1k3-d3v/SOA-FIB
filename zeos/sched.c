@@ -7,7 +7,6 @@
 #include <io.h>
 #include <interrupt.h>
 
-
 struct task_struct * idle_task;
 union task_union * idle_task_union;
 
@@ -69,6 +68,7 @@ void init_idle (void)
 	idle_task_union = (union task_union*)idle_task;
 
 	idle_task->PID = 0;
+	idle_task->quantum = 1;
 	allocate_DIR(idle_task);
 
 	idle_task_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long) cpu_idle;
@@ -85,6 +85,7 @@ void init_task1(void)
 	init_task_union = (union task_union*)init_task;
 
 	init_task->PID = 1;
+	init_task->quantum = 5;
 	allocate_DIR(init_task);
 
 	set_user_pages(init_task);
@@ -123,4 +124,31 @@ void inner_task_switch(union task_union *new) {
 	current()->kernel_esp = get_ebp();
 	
 	stack_change((unsigned int)new->task.kernel_esp);
+}
+
+void update_sched_data_rr() {
+	current()->quantum--;
+}
+
+int needs_sched_rr() {
+	if (current()->quantum <= 0) {
+		return 1;
+	}
+	return 0;
+}
+
+void update_process_state_rr(struct task_struct *t, struct list_head *dest) {
+	if (dest == NULL) {
+		union task_union *new = (union task_union*)list_head_to_task_struct(list_first(&ready_queue));
+		list_del(list_first(&ready_queue));
+		task_switch(new);
+	}
+}
+
+void schedule(struct task_struct *t, struct list_head *dest) {
+	update_sched_data_rr();
+
+	if (needs_sched_rr()) {
+		update_process_state_rr(t, dest);
+	}
 }

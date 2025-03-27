@@ -123,6 +123,8 @@ void clock_routine()
 {
   ++zeos_ticks;
   zeos_show_clock();
+
+  schedule(current(), NULL);
   
   /*TEST FORK
   if (zeos_ticks % 10 == 0) {

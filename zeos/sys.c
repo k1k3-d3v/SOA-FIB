@@ -130,7 +130,7 @@ int sys_fork()
   child_struct->PID = PID_global++;
 
   // h) Inicializar campos task_struct del hijo
-  child_struct->state = ST_READY; // Poner proceso en estado ready
+  child_struct->quantum = 5;
 
   // i) Preparar la pila del hijo para task_switch
   child_union->stack[KERNEL_STACK_SIZE - 18] = (unsigned long)&ret_from_fork;              // Establecemos la dirección de retorno de la función fork
