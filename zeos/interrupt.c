@@ -18,6 +18,10 @@ extern void clock_handler();
 extern void pf_handler();
 extern void syscall_handler_sysenter();
 
+struct task_struct * child_struct;
+union task_union * child_union;
+struct task_struct * father_struct;
+
 int zeos_ticks = 0;
 
 char char_map[] =
@@ -119,59 +123,28 @@ void clock_routine()
 {
   ++zeos_ticks;
   zeos_show_clock();
-  /*
+  
   if (zeos_ticks % 10 == 0) {
     if(current()->PID == 1000) {
-      printk("Soy el alcalde\n");
-      task_switch();
+      printk("Soy el hijo\n");
+      task_switch((union task_union*)father_struct);
     }
     else {
-      printk("Soy el hijo del alcalde\n");
-      task_switch();
+      printk("Yo soy tu padre\n");
+      task_switch(child_union);
     }
   }
-  */
-}
-
-void itoh_sys(int a, char *b) //Funcion para pasar de int a hex(char)
-{
-  int i, i1;
-  char c;
-  char hex_digits[] = "0123456789ABCDEF";
-
-  if (a == 0) { b[0] = '0'; b[1] = 0; return; }
-
-  i = 0;
-  while (a > 0)
-  {
-    b[i] = hex_digits[a % 16];
-    a = a / 16;
-    i++;
-  }
-
-  for (i1 = 0; i1 < i / 2; i1++)
-  {
-    c = b[i1];
-    b[i1] = b[i - i1 - 1];
-    b[i - i1 - 1] = c;
-  }
-  b[i] = 0;
 }
 
 void pf_routine(int error, int address)
 {
-  char message[] = "Process generates a PAGE FAULT exception at EIP: ";
-  char space[] = "\n";
-  char prefix[] = "0x";
-  char number[20];
-
-  itoh_sys(address, number);
-
-  printk(space);
-  printk(message);
-  printk(prefix);
-  printk(number);
-  printk(space);
-
-  while(1);
+  char digit[] = "0123456789abcdef";
+ 
+   printk( "\n\nProcess generates a PAGE FAULT exception at EIP: 0x" );
+ 
+   for (int i = 32; i >= 0; i -= 4) printc(digit[(address >> i) & 0xF]);
+     
+   printk( "\n\nApplying general protection fault...\n" );
+ 
+       while (1);
 }

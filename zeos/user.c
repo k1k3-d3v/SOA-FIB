@@ -19,8 +19,9 @@ int __attribute__ ((__section__(".text.main")))
    int var = addASM(0x42, 0x666);
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
    
-  /*TEST FORK
+  //TEST FORK
    int pid = fork();
+   /*
    if (pid == 0) {
      // Proceso hijo
      write(1, "Este es el proceso hijo\n", 25);
@@ -31,7 +32,8 @@ int __attribute__ ((__section__(".text.main")))
      // Fallo en fork
      write(1, "Fallo en fork\n", 14);
    }
-  */
+    */
+  
 
   /*TEST PAGE_FAULT 
   int *p = 0x0;

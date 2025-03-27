@@ -27,6 +27,11 @@ extern int zeos_ticks;
 extern struct list_head free_queue;
 extern struct list_head ready_queue;
 
+extern struct task_struct * child_struct;
+extern union task_union * child_union;
+
+extern struct task_struct * father_struct;
+
 extern unsigned int get_ebp();
 
 int PID_global = 1000;
@@ -55,6 +60,9 @@ int ret_from_fork()
 
 int sys_fork()
 {
+  //TESTEO
+  father_struct = current();
+
   //Comprobar si hay espacio en la cola de procesos libres
   if (list_empty(&free_queue)) return -ENOMEM;
 
