@@ -18,9 +18,9 @@ extern void clock_handler();
 extern void pf_handler();
 extern void syscall_handler_sysenter();
 
-struct task_struct * child_struct;
-union task_union * child_union;
-struct task_struct * father_struct;
+//extern union task_union * child_union_global;
+//struct task_struct * father_struct;
+
 
 int zeos_ticks = 0;
 
@@ -124,6 +124,7 @@ void clock_routine()
   ++zeos_ticks;
   zeos_show_clock();
   
+  /*TEST FORK
   if (zeos_ticks % 10 == 0) {
     if(current()->PID == 1000) {
       printk("Soy el hijo\n");
@@ -131,9 +132,10 @@ void clock_routine()
     }
     else {
       printk("Yo soy tu padre\n");
-      task_switch(child_union);
+      task_switch(child_union_global);
     }
   }
+  */
 }
 
 void pf_routine(int error, int address)

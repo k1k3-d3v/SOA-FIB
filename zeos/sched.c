@@ -120,7 +120,7 @@ void inner_task_switch(union task_union *new) {
 	writeMSR(0x175, (unsigned long)&new->stack[KERNEL_STACK_SIZE]);
 
 	set_cr3(new->task.dir_pages_baseAddr);
-
 	current()->kernel_esp = get_ebp();
+	
 	stack_change((unsigned int)new->task.kernel_esp);
 }
