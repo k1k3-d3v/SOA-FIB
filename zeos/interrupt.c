@@ -139,14 +139,13 @@ void clock_routine()
   }
   */
 
-  /*TEST SCHEDULER
   int pid = current()->PID;
   char pid_str[10];
   itoa(pid, pid_str, 10);
   printk("Current PID: ");
   printk(pid_str);
   printk("\n");
-  */
+  exit();
 }
 
 void pf_routine(int error, int address)

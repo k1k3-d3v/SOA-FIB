@@ -146,6 +146,23 @@ int sys_fork()
 
 void sys_exit()
 {
+  page_table_entry *PT = get_PT(current());
+
+  //Desalocar las páginas de datos del proceso
+  for (int i=0; i<NUM_PAG_DATA; i++)
+  {
+    free_frame(get_frame(PT, PAG_LOG_INIT_DATA+i));
+    del_ss_pag(PT, PAG_LOG_INIT_DATA+i);
+  }
+  
+  //Free task_struct
+  list_add_tail(&(current()->list), &free_queue);
+  
+  //Dar valor inválido de PID
+  current()->PID=-1;
+  
+  //Restarts execution of the next process
+  sched_next_rr();
 }
 
 int sys_gettime()

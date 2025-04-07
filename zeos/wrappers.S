@@ -143,3 +143,38 @@ final4:
     movl %ebp, %esp
     popl %ebp
     ret
+
+ENTRY(exit)
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl %ecx
+    pushl %edx
+
+    movl $1, %eax     
+
+    pushl $return5
+    pushl %ebp
+    movl %esp, %ebp
+
+    sysenter
+
+return5:
+    popl %ebp
+    addl $4, %esp
+    popl %edx
+    popl %ecx
+
+    cmpl $0, %eax
+    jl eaxNegative5
+    jmp final5
+
+eaxNegative5:
+    negl %eax
+    movl %eax, errno
+    movl $-1, %eax
+
+final5:
+    movl %ebp, %esp
+    popl %ebp
+    ret

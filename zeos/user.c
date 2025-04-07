@@ -20,7 +20,12 @@ int __attribute__ ((__section__(".text.main")))
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
    
   //TEST FORK
-  //int pid = fork();  
+  int pid = fork();
+  int pid1 = fork();
+  int pid2 = fork();  
+  int pid3 = fork();  
+  int pid4 = fork();
+  int pid5 = fork();    
 
   /*TEST PAGE_FAULT 
   int *p = 0x0;
