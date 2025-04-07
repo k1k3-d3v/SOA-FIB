@@ -168,9 +168,23 @@ void sys_exit()
 
   //Dar valor inválido de PID
   current()->PID=-1;
+  current()->dir_pages_baseAddr = NULL;
+  current()->father = NULL;
   
-  //Restarts execution of the next process
-  sched_next_rr();
+  //Liberar la memoria de los hijos
+  //Recorremos la lista de hijos y liberamos su memoria
+  //Eliminamos el padre de la lista de hijos
+  struct list_head * e = list_first(&(current()->childs));
+    if (!list_empty(&(current()->childs))) {
+        list_for_each(e, &(current()->childs)) {
+            struct task_struct* t = list_head_to_task_struct(e);
+            t->father = NULL;
+            list_del(&t->anchor);
+        }
+    }
+
+	update_process_state_rr(current(), &free_queue);
+	sched_next_rr();
 }
 
 int sys_gettime()
@@ -246,4 +260,20 @@ void sys_block(void) {
 }
 
 int sys_unblock(int pid) {
+    struct list_head *tmp = &(current()->childs);
+    struct list_head *e = tmp->next;
+
+    while (e != tmp) {
+        struct task_struct* t = list_entry(e, struct task_struct, anchor);
+        
+        if (t->PID == pid && t->pending_unblocks > 0) {
+            update_process_state_rr(t, &ready_queue);
+            return 0;
+        } else if (t->PID == pid) {
+            t->pending_unblocks++;
+        }
+
+        e = e->next; // Avanzar al siguiente elemento
+    }
+    return 0;
 }
