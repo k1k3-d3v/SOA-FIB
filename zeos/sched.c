@@ -69,6 +69,11 @@ void init_idle (void)
 
 	idle_task->PID = 0;
 	idle_task->quantum = 1;
+	idle_task->pending_unblocks = 0;
+	idle_task->father = NULL;
+	
+  	INIT_LIST_HEAD(&idle_task->childs);
+	
 	allocate_DIR(idle_task);
 
 	idle_task_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long) cpu_idle;
@@ -86,6 +91,11 @@ void init_task1(void)
 
 	init_task->PID = 1;
 	init_task->quantum = 5;
+	init_task->pending_unblocks = 0;
+	init_task->father = NULL;
+
+	INIT_LIST_HEAD(&init_task->childs);
+	
 	allocate_DIR(init_task);
 
 	set_user_pages(init_task);
@@ -142,9 +152,7 @@ int needs_sched_rr() {
 
 void update_process_state_rr(struct task_struct *t, struct list_head *dest) {
 	if(t != idle_task){
-		if (dest == &ready_queue) {
-			list_add_tail(&t->list, dest);
-		}
+		list_add_tail(&t->list, dest);
 	}
 }
 

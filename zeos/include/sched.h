@@ -26,6 +26,10 @@ struct task_struct {
   struct list_head list;
   unsigned long kernel_esp;
   int quantum;
+  int pending_unblocks;
+  struct task_struct* father;
+  struct list_head childs;
+  struct list_head anchor;
 };
 
 union task_union {

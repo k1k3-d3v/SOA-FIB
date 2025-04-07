@@ -178,3 +178,75 @@ final5:
     movl %ebp, %esp
     popl %ebp
     ret
+
+ENTRY(block)
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl %ecx
+    pushl %edx
+
+    movl $21, %eax     
+
+    pushl $return6
+    pushl %ebp
+    movl %esp, %ebp
+
+    sysenter
+
+return6:
+    popl %ebp
+    addl $4, %esp
+    popl %edx
+    popl %ecx
+
+    cmpl $0, %eax
+    jl eaxNegative6
+    jmp final6
+
+eaxNegative6:
+    negl %eax
+    movl %eax, errno
+    movl $-1, %eax
+
+final6:
+    movl %ebp, %esp
+    popl %ebp
+    ret
+
+ENTRY(unblock)
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl %ecx
+    pushl %edx
+
+    movl 0x08(%ebp), %edx
+
+    movl $22, %eax     
+
+    pushl $return7
+    pushl %ebp
+    movl %esp, %ebp
+
+    sysenter
+
+return7:
+    popl %ebp
+    addl $4, %esp
+    popl %edx
+    popl %ecx
+
+    cmpl $0, %eax
+    jl eaxNegative7
+    jmp final7
+
+eaxNegative7:
+    negl %eax
+    movl %eax, errno
+    movl $-1, %eax
+
+final7:
+    movl %ebp, %esp
+    popl %ebp
+    ret

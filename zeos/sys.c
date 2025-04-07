@@ -26,6 +26,7 @@ extern int zeos_ticks;
 
 extern struct list_head free_queue;
 extern struct list_head ready_queue;
+extern struct list_head blocked;
 
 // union task_union * child_union_global;
 // extern struct task_struct * father_struct;
@@ -131,6 +132,10 @@ int sys_fork()
 
   // h) Inicializar campos task_struct del hijo
   child_struct->quantum = 5;
+  child_struct->father = current(); // Asignamos el padre al hijo
+  child_struct->pending_unblocks = 0; // Inicializamos el número de bloqueos pendientes del hijo a 0
+  INIT_LIST_HEAD(&child_struct->anchor);
+  INIT_LIST_HEAD(&child_struct->childs);
 
   // i) Preparar la pila del hijo para task_switch
   child_union->stack[KERNEL_STACK_SIZE - 18] = (unsigned long)&ret_from_fork;              // Establecemos la dirección de retorno de la función fork
@@ -139,6 +144,9 @@ int sys_fork()
 
   // j) Añadir hijo a la cola de listos
   list_add_tail(&child_struct->list, &ready_queue);
+
+  //Añadir el hijo a la lista de hijos del padre
+  list_add_tail(&child_struct->anchor, &(current()->childs));
 
   // k) Devolver PID del hijo
   return child_struct->PID;
@@ -157,7 +165,7 @@ void sys_exit()
   
   //Free task_struct
   list_add_tail(&(current()->list), &free_queue);
-  
+
   //Dar valor inválido de PID
   current()->PID=-1;
   
@@ -224,4 +232,18 @@ int sys_write(int fd, char *buffer, int size)
     bytes -= w_bytes;
   }
   return size - bytes; // Devuelve el número de bytes escritos
+}
+
+void sys_block(void) {
+  if(current() != init_task) {
+    current()->pending_unblocks = current()->pending_unblocks -1;
+    if (current()->pending_unblocks <= 0) {
+      current()->pending_unblocks = 1;
+      update_process_state_rr(current(), &blocked);
+      sched_next_rr();
+    } 
+  }
+}
+
+int sys_unblock(int pid) {
 }

@@ -145,7 +145,6 @@ void clock_routine()
   printk("Current PID: ");
   printk(pid_str);
   printk("\n");
-  exit();
 }
 
 void pf_routine(int error, int address)

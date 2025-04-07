@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "cstdlib": "c",
+        "memory_resource": "c",
+        "shared_mutex": "c"
+    }
+}
