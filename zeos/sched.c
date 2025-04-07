@@ -131,24 +131,45 @@ void update_sched_data_rr() {
 }
 
 int needs_sched_rr() {
-	if (current()->quantum <= 0) {
+	if (current()->quantum <= 0 && !list_empty(&ready_queue)) {
 		return 1;
+	}
+	if (current()->quantum <= 0) {
+		current()->quantum = 5;
 	}
 	return 0;
 }
 
 void update_process_state_rr(struct task_struct *t, struct list_head *dest) {
-	if (dest == NULL) {
-		union task_union *new = (union task_union*)list_head_to_task_struct(list_first(&ready_queue));
-		list_del(list_first(&ready_queue));
-		task_switch(new);
+	if(t != idle_task){
+		if (dest == &ready_queue) {
+			list_add_tail(&t->list, dest);
+		}
 	}
 }
 
-void schedule(struct task_struct *t, struct list_head *dest) {
+void sched_next_rr() {
+	struct task_struct *t;
+	struct list_head* l = list_first(&ready_queue);
+	t = list_head_to_task_struct(l);
+	list_del(l);
+	t->quantum = 5;
+	
+	task_switch((union task_union*)t);
+} 
+
+void schedule() {
 	update_sched_data_rr();
 
 	if (needs_sched_rr()) {
-		update_process_state_rr(t, dest);
+		update_process_state_rr(current(), &ready_queue);
+		sched_next_rr();
 	}
+}
+
+int get_quantum (struct task_struct *t){
+	return t->quantum;
+}
+void set_quantum (struct task_struct *t, int new_quantum){
+	t->quantum = new_quantum;
 }

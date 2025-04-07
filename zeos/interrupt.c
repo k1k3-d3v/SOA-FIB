@@ -124,7 +124,7 @@ void clock_routine()
   ++zeos_ticks;
   zeos_show_clock();
 
-  schedule(current(), NULL);
+  schedule();
   
   /*TEST FORK
   if (zeos_ticks % 10 == 0) {
@@ -137,6 +137,15 @@ void clock_routine()
       task_switch(child_union_global);
     }
   }
+  */
+
+  /*TEST SCHEDULER
+  int pid = current()->PID;
+  char pid_str[10];
+  itoa(pid, pid_str, 10);
+  printk("Current PID: ");
+  printk(pid_str);
+  printk("\n");
   */
 }
 

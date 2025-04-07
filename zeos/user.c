@@ -20,20 +20,7 @@ int __attribute__ ((__section__(".text.main")))
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
    
   //TEST FORK
-   int pid = fork();
-   /*
-   if (pid == 0) {
-     // Proceso hijo
-     write(1, "Este es el proceso hijo\n", 25);
-   } else if (pid > 0) {
-     // Proceso padre
-     write(1, "Este es el proceso padre\n", 26);
-   } else {
-     // Fallo en fork
-     write(1, "Fallo en fork\n", 14);
-   }
-    */
-  
+  //int pid = fork();  
 
   /*TEST PAGE_FAULT 
   int *p = 0x0;

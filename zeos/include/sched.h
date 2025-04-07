@@ -70,6 +70,8 @@ void sched_next_rr();
 void update_process_state_rr(struct task_struct *t, struct list_head *dest);
 int needs_sched_rr();
 void update_sched_data_rr();
-void schedule(struct task_struct *t, struct list_head *dest);
+void schedule();
+int get_quantum (struct task_struct *t);
+void set_quantum (struct task_struct *t, int new_quantum);
 
 #endif  /* __SCHED_H__ */
