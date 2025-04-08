@@ -2,6 +2,16 @@
     "files.associations": {
         "cstdlib": "c",
         "memory_resource": "c",
-        "shared_mutex": "c"
+        "shared_mutex": "c",
+        "mm_address.h": "c",
+        "devices.h": "c",
+        "utils.h": "c",
+        "io.h": "c",
+        "mm.h": "c",
+        "sched.h": "c",
+        "errno.h": "c",
+        "list.h": "c",
+        "libc.h": "c",
+        "*.tcc": "c"
     }
 }

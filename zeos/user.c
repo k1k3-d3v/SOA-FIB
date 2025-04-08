@@ -19,13 +19,29 @@ int __attribute__ ((__section__(".text.main")))
    int var = addASM(0x42, 0x666);
    (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
    
-  //TEST FORK
-  //int pid = fork();
 
   /*TEST PAGE_FAULT 
   int *p = 0x0;
   *p = 0;
   */
+
+  //TEST BLOCK/UNBLOCK
+  int pid = fork();
+
+  if (pid == 0) {
+    // Child process
+    write(1, "Child process: Blocking itself\n", 31);
+    block(); // Child blocks itself
+    write(1, "Child process: Unblocked by parent\n", 36);
+  } else if (pid > 0) {
+    // Parent process
+    write(1, "Parent process: Waiting before unblocking child\n", 48);
+    for (int i = 0; i < 100000000; i++) {
+      asm volatile("nop");
+    }
+    write(1, "Parent process: Unblocking child\n", 34);
+    unblock(pid); // Parent unblocks the child
+  }
  
-   while(1) {}
+  while(1) {}
 }

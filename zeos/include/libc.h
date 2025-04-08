@@ -26,4 +26,8 @@ int fork();
 
 void exit();
 
+void block(void);
+
+int unblock(int pid);
+
 #endif  /* __LIBC_H__ */

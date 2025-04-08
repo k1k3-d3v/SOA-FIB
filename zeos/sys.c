@@ -269,7 +269,8 @@ int sys_unblock(int pid) {
         if (t->PID == pid && t->pending_unblocks > 0) {
             update_process_state_rr(t, &ready_queue);
             return 0;
-        } else if (t->PID == pid) {
+        }
+        else if (t->PID == pid) {
             t->pending_unblocks++;
         }
 
