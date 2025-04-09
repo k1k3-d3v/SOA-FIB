@@ -83,6 +83,9 @@ void perror() {
         case ENOMEM:
             zeos_strcpy(buff, "\nOut of memory\n");
             break;
+        case EAGAIN:
+            zeos_strcpy(buff, "\nResource temporarily unavailable\n");
+            break;
     }
 
     write(1, buff, strlen(buff));

@@ -27,13 +27,19 @@ int __attribute__ ((__section__(".text.main")))
 
   //TEST FORK/SCHEDULER
   int pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
+
+  while(1) {
+    if(getpid() >= 1000) {
+      write(1, "Soy el hijo\n", 12);
+      char pid_str[10];
+      itoa(getpid(), pid_str);
+      write(1, pid_str, strlen(pid_str));
+      write(1, "\n", 1);
+      write(1, "Exiting process\n", 17);
+      exit();
+      exit();
+    }
+  }  
 
   /*TEST BLOCK/UNBLOCK
   if (pid == 0) {

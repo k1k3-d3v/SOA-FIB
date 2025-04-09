@@ -60,106 +60,103 @@ int ret_from_fork()
 }
 
 int sys_fork (void) {
-  int PID = -1;
-
+  // Comprobamos si hay procesos libres en la cola de procesos libres
   if (!list_empty(&free_queue)) {
-      struct list_head *lh = list_first(&free_queue);
-      list_del(lh);
-      struct task_struct *ts = list_head_to_task_struct(lh);
+      // Obtenemos el primer elemento de la cola de procesos libres
+      struct list_head *l = list_first(&free_queue);
+      list_del(l); // Lo eliminamos de la cola
+      struct task_struct *t = list_head_to_task_struct(l); // Obtenemos la estructura del proceso
 
-      copy_data(current(), ts, sizeof(union task_union));
-      allocate_DIR(ts);
+      // Copiamos los datos del proceso actual al nuevo proceso
+      copy_data(current(), t, sizeof(union task_union));
+      allocate_DIR(t);
 
-      int avail_frames[NUM_PAG_DATA];
+      int pages[NUM_PAG_DATA]; // Array para almacenar los frames asignados
 
+      // Asignamos frames para las páginas de datos del proceso hijo
       for (int i = 0; i < NUM_PAG_DATA; ++i) {
-          avail_frames[i] = alloc_frame();
-          if (avail_frames[i] < 0) {
+          pages[i] = alloc_frame();
+          if (pages[i] < 0) { // Si no se pueden asignar frames, liberamos los ya asignados
               for (int j = 0; j <= i; ++j) {
-                  free_frame(avail_frames[j]);
+                  free_frame(pages[j]);
               }
-              list_add_tail(&ts->list, &free_queue);
-              return -1;
+              list_add_tail(&t->list, &free_queue); // Devolvemos el proceso a la cola de libres
+                return -ENOMEM; // Error al asignar frames
           }
       }
 
+      // Compartimos las páginas de kernel entre el padre y el hijo
       for (int i = 0; i < NUM_PAG_KERNEL; ++i) {
-          set_ss_pag(get_PT(ts), i, get_frame(get_PT(current()), i));
+          set_ss_pag(get_PT(t), i, get_frame(get_PT(current()), i));
       }
 
+      // Asignamos las páginas de datos al hijo y copiamos los datos del padre
       for (int i = 0; i < NUM_PAG_DATA; ++i) {
-          set_ss_pag(get_PT(ts), i + NUM_PAG_KERNEL, avail_frames[i]);
-          set_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE, avail_frames[i]);
-          copy_data((void*)((i + NUM_PAG_KERNEL) << 12), (void*)((i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE) << 12), PAGE_SIZE);
-          del_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE);
+          set_ss_pag(get_PT(t), i + NUM_PAG_KERNEL, pages[i]);                                                                          // Asignamos la página al hijo
+          set_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE, pages[i]);                                    // Temporalmente al padre
+          copy_data((void*)((i + NUM_PAG_KERNEL) << 12), (void*)((i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE) << 12), PAGE_SIZE); // Copiamos los datos
+          del_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE);                                              // Eliminamos la asignación temporal
       }
 
+      // Compartimos las páginas de código entre el padre y el hijo
       for (int i = 0; i < NUM_PAG_CODE; ++i) {
-          set_ss_pag(get_PT(ts), i + NUM_PAG_KERNEL + NUM_PAG_DATA , get_frame(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA ));
+          set_ss_pag(get_PT(t), i + NUM_PAG_KERNEL + NUM_PAG_DATA , get_frame(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA ));
       }
 
-      set_cr3(get_DIR(current()));
+      set_cr3(get_DIR(current())); // Restauramos el directorio de páginas del padre con un flush del TLB
 
-      
+      // Inicializamos los valores del proceso hijo
+      t->PID = PID_global++; 
+      t->father = current(); 
+      t->pending_unblocks = 0; 
+      INIT_LIST_HEAD(&t->anchor); 
+      INIT_LIST_HEAD(&t->childs);
 
-      PID = PID_global++;
-      ts->PID = PID;
-      ts->father = current();
-      ts->pending_unblocks = 0;
-      INIT_LIST_HEAD(&ts->anchor);
-      INIT_LIST_HEAD(&ts->childs);
+      // Configuramos la pila del kernel para el proceso hijo
+      union task_union *tu = (union task_union*) t;
+      tu->stack[KERNEL_STACK_SIZE - 19] = (unsigned long) 0;              // Valor de retorno
+      tu->stack[KERNEL_STACK_SIZE - 18] = (unsigned long) ret_from_fork;  // Dirección de retorno
+      t->kernel_esp = (unsigned long) &tu->stack[KERNEL_STACK_SIZE - 19]; // Apuntamos al nuevo ESP
 
-      union task_union *tu = (union task_union*) ts;
+      // Añadimos el proceso hijo a la cola de listos y a la lista de hijos del padre
+      list_add_tail(&t->list, &ready_queue);
+      list_add_tail(&t->anchor, &(current()->childs));
 
-      tu->stack[KERNEL_STACK_SIZE - 19] = (unsigned long) 0;
-
-      tu->stack[KERNEL_STACK_SIZE - 18] = (unsigned long) ret_from_fork;
-
-      ts->kernel_esp = (unsigned long) &tu->stack[KERNEL_STACK_SIZE - 19];
-
-      list_add_tail(&ts->list, &ready_queue);
-
-      
-      list_add_tail(&ts->anchor, &(current()->childs));
-
-      return PID; 
+      return t->PID;
   }
   
-  return -1;
+  return -EAGAIN; // Error si no hay procesos libres
 }
 
 void sys_exit()
 {
-  page_table_entry *PT = get_PT(current());
+  if(sys_getpid() == 1) return; //Comprobamos que no es el proceso init
+    struct task_struct* t = current();
+	  page_table_entry *entry = t->dir_pages_baseAddr;
 
-  //Desalocar las páginas de datos del proceso
-  for (int i=0; i<NUM_PAG_DATA; i++)
-  {
-    free_frame(get_frame(PT, PAG_LOG_INIT_DATA+i));
-    del_ss_pag(PT, PAG_LOG_INIT_DATA+i);
-  }
-  
-  //Free task_struct
-  list_add_tail(&(current()->list), &free_queue);
+  //Liberar memoria
+	for (int i = 0; i < NUM_PAG_DATA; ++i) {
+		free_frame(get_frame(entry, i + NUM_PAG_KERNEL));
+		del_ss_pag(entry, i + NUM_PAG_KERNEL);
+	}
 
-  //Dar valor inválido de PID
-  current()->PID=-1;
-  current()->dir_pages_baseAddr = NULL;
-  current()->father = NULL;
-  
-  //Liberar la memoria de los hijos
-  //Recorremos la lista de hijos y liberamos su memoria
-  //Eliminamos el padre de la lista de hijos
+	t->PID = -1;
+	t->dir_pages_baseAddr = NULL;
+  t->father = NULL;
+
+  if (t->anchor.next == NULL && t->anchor.prev == NULL) list_del(&t->anchor);
+
   struct list_head * e = list_first(&(current()->childs));
-    if (!list_empty(&(current()->childs))) {
-        list_for_each(e, &(current()->childs)) {
-            struct task_struct* t = list_head_to_task_struct(e);
-            t->father = NULL;
-            list_del(&t->anchor);
-        }
-    }
 
-	update_process_state_rr(current(), &free_queue);
+  if (!list_empty(&(current()->childs))) {
+    list_for_each(e, &(current()->childs)) {
+      struct task_struct* ts = list_head_to_task_struct(e);
+      ts->father = NULL;
+      list_del(&ts->anchor);
+    }
+  }
+
+	update_process_state_rr(t, &free_queue);
 	sched_next_rr();
 }
 
