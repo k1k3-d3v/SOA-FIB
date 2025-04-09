@@ -118,7 +118,7 @@ int sys_fork()
   }
 
   // f) Heredar datos + pila del padre (Mediante creacion de páginas temporales)
-  for (int i = NUM_PAG_KERNEL + NUM_PAG_CODE; i < NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i++)
+  for (int i = PAG_LOG_INIT_DATA; i < PAG_LOG_INIT_DATA + NUM_PAG_DATA; i++)
   {
     set_ss_pag(parent_PT, i + NUM_PAG_DATA, get_frame(child_PT, i));             // Asignamos la pagina fisica del hijo al padre
     copy_data((void *)(i << 12), (void *)((i + NUM_PAG_DATA) << 12), PAGE_SIZE); // Convertimos el número de página a dirección física

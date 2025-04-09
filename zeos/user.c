@@ -16,8 +16,8 @@ int __attribute__ ((__section__(".text.main")))
 {
     /* Next line, tries to move value 0 to CR3 register. This register is a privileged one, and so it will raise an exception */
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
-   int var = addASM(0x42, 0x666);
-   (void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
+   //int var = addASM(0x42, 0x666);
+   //(void)var; //Para que no salte el warning de UNUSED VARIABLE VAR
    
 
   /*TEST PAGE_FAULT 
@@ -26,8 +26,10 @@ int __attribute__ ((__section__(".text.main")))
   */
 
   //TEST BLOCK/UNBLOCK
+  
   int pid = fork();
 
+  /*
   if (pid == 0) {
     // Child process
     write(1, "Child process: Blocking itself\n", 31);
@@ -42,6 +44,7 @@ int __attribute__ ((__section__(".text.main")))
     write(1, "Parent process: Unblocking child\n", 34);
     unblock(pid); // Parent unblocks the child
   }
+  */
  
   while(1) {}
 }
