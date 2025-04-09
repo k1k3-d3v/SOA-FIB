@@ -25,11 +25,17 @@ int __attribute__ ((__section__(".text.main")))
   *p = 0;
   */
 
-  //TEST BLOCK/UNBLOCK
-  
+  //TEST FORK/SCHEDULER
   int pid = fork();
+  pid = fork();
+  pid = fork();
+  pid = fork();
+  pid = fork();
+  pid = fork();
+  pid = fork();
+  pid = fork();
 
-  /*
+  /*TEST BLOCK/UNBLOCK
   if (pid == 0) {
     // Child process
     write(1, "Child process: Blocking itself\n", 31);

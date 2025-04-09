@@ -59,97 +59,73 @@ int ret_from_fork()
   return 0;
 }
 
-int sys_fork()
-{
-  // Comprobar si hay espacio en la cola de procesos libres
-  if (list_empty(&free_queue))
-    return -ENOMEM;
+int sys_fork (void) {
+  int PID = -1;
 
-  // a) Asignar primer task_struct libre
-  struct list_head *e = list_first(&free_queue);
-  list_del(e);
+  if (!list_empty(&free_queue)) {
+      struct list_head *lh = list_first(&free_queue);
+      list_del(lh);
+      struct task_struct *ts = list_head_to_task_struct(lh);
 
-  struct task_struct *child_struct = list_head_to_task_struct(e);
-  union task_union *child_union = (union task_union *)child_struct;
+      copy_data(current(), ts, sizeof(union task_union));
+      allocate_DIR(ts);
 
-  // b) Copiamos el PCB del padre al hijo
-  copy_data(current(), child_union, sizeof(union task_union));
+      int avail_frames[NUM_PAG_DATA];
 
-  // c) Asignamos un directorio al hijo
-  allocate_DIR(child_struct);
-
-  page_table_entry *child_PT = get_PT(child_struct);
-
-  // d) Buscando páginas libres para la pila y código de usuario del hijo
-  int pages[NUM_PAG_DATA];
-
-  for (int i = 0; i < NUM_PAG_DATA; i++)
-  {
-    pages[i] = alloc_frame();
-
-    if (pages[i] == -1)
-    {
-      for (int j = 0; j < i; j++)
-      {
-        free_frame(pages[j]);
+      for (int i = 0; i < NUM_PAG_DATA; ++i) {
+          avail_frames[i] = alloc_frame();
+          if (avail_frames[i] < 0) {
+              for (int j = 0; j <= i; ++j) {
+                  free_frame(avail_frames[j]);
+              }
+              list_add_tail(&ts->list, &free_queue);
+              return -1;
+          }
       }
 
-      list_add_tail(&child_struct->list, &free_queue);
-      return -ENOMEM;
-    }
+      for (int i = 0; i < NUM_PAG_KERNEL; ++i) {
+          set_ss_pag(get_PT(ts), i, get_frame(get_PT(current()), i));
+      }
+
+      for (int i = 0; i < NUM_PAG_DATA; ++i) {
+          set_ss_pag(get_PT(ts), i + NUM_PAG_KERNEL, avail_frames[i]);
+          set_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE, avail_frames[i]);
+          copy_data((void*)((i + NUM_PAG_KERNEL) << 12), (void*)((i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE) << 12), PAGE_SIZE);
+          del_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE);
+      }
+
+      for (int i = 0; i < NUM_PAG_CODE; ++i) {
+          set_ss_pag(get_PT(ts), i + NUM_PAG_KERNEL + NUM_PAG_DATA , get_frame(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA ));
+      }
+
+      set_cr3(get_DIR(current()));
+
+      
+
+      PID = PID_global++;
+      ts->PID = PID;
+      ts->father = current();
+      ts->pending_unblocks = 0;
+      INIT_LIST_HEAD(&ts->anchor);
+      INIT_LIST_HEAD(&ts->childs);
+
+      union task_union *tu = (union task_union*) ts;
+
+      tu->stack[KERNEL_STACK_SIZE - 19] = (unsigned long) 0;
+
+      tu->stack[KERNEL_STACK_SIZE - 18] = (unsigned long) ret_from_fork;
+
+      ts->kernel_esp = (unsigned long) &tu->stack[KERNEL_STACK_SIZE - 19];
+
+      list_add_tail(&ts->list, &ready_queue);
+
+      
+      list_add_tail(&ts->anchor, &(current()->childs));
+
+      return PID; 
   }
-
-  page_table_entry *parent_PT = get_PT(current());
-
-  // e) Mappear las páginas de sistema, codifo y datos + pila de usuario ()
-  for (int i = 0; i < NUM_PAG_KERNEL; i++)
-  {
-    set_ss_pag(child_PT, i, get_frame(parent_PT, i));
-  }
-
-  for (int i = 0; i < NUM_PAG_CODE; i++)
-  {
-    set_ss_pag(child_PT, PAG_LOG_INIT_CODE + i, get_frame(parent_PT, PAG_LOG_INIT_CODE + i));
-  }
-
-  for (int i = 0; i < NUM_PAG_DATA; i++)
-  {
-    set_ss_pag(child_PT, PAG_LOG_INIT_DATA + i, pages[i]);
-  }
-
-  // f) Heredar datos + pila del padre (Mediante creacion de páginas temporales)
-  for (int i = PAG_LOG_INIT_DATA; i < PAG_LOG_INIT_DATA + NUM_PAG_DATA; i++)
-  {
-    set_ss_pag(parent_PT, i + NUM_PAG_DATA, get_frame(child_PT, i));             // Asignamos la pagina fisica del hijo al padre
-    copy_data((void *)(i << 12), (void *)((i + NUM_PAG_DATA) << 12), PAGE_SIZE); // Convertimos el número de página a dirección física
-    del_ss_pag(parent_PT, i + NUM_PAG_DATA);                                     // Eliminamos la página temporal creada en el padre
-  }
-
-  set_cr3(get_DIR(current())); // Forzamos un flush de la TLB para eliminar los accesos del padre a las páginas del hijo
-
-  // g) Asignar PID al hijo != posición en el vector de tareas
-  child_struct->PID = PID_global++;
-
-  // h) Inicializar campos task_struct del hijo
-  child_struct->quantum = 5;
-  child_struct->father = current(); // Asignamos el padre al hijo
-  child_struct->pending_unblocks = 0; // Inicializamos el número de bloqueos pendientes del hijo a 0
-  INIT_LIST_HEAD(&child_struct->anchor);
-  INIT_LIST_HEAD(&child_struct->childs);
-
-  // i) Preparar la pila del hijo para task_switch
-  child_union->stack[KERNEL_STACK_SIZE - 18] = (unsigned long)&ret_from_fork;              // Establecemos la dirección de retorno de la función fork
-  child_union->stack[KERNEL_STACK_SIZE - 19] = 0;                                          // Establecemos el fake_ebp en 0
-  child_struct->kernel_esp = (unsigned long)&(child_union->stack[KERNEL_STACK_SIZE - 19]); // Hacemos que kernel_esp apunte al tope de la pila
-
-  // j) Añadir hijo a la cola de listos
-  list_add_tail(&child_struct->list, &ready_queue);
-
-  //Añadir el hijo a la lista de hijos del padre
-  list_add_tail(&child_struct->anchor, &(current()->childs));
-
-  // k) Devolver PID del hijo
-  return child_struct->PID;
+  
+  return -1;
 }
 
 void sys_exit()
