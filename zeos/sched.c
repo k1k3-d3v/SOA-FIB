@@ -17,6 +17,8 @@ extern struct list_head blocked;
 struct list_head ready_queue;
 struct list_head free_queue;
 
+int quantum_global = 0;
+
 
 union task_union task[NR_TASKS]
   __attribute__((__section__(".data.task")));
@@ -68,7 +70,7 @@ void init_idle (void)
 	idle_task_union = (union task_union*)idle_task;
 
 	idle_task->PID = 0;
-	idle_task->quantum = 1;
+	set_quantum(idle_task, 1);
 	idle_task->pending_unblocks = 0;
 	idle_task->father = NULL;
 	
@@ -90,7 +92,7 @@ void init_task1(void)
 	init_task_union = (union task_union*)init_task;
 
 	init_task->PID = 1;
-	init_task->quantum = 5;
+	set_quantum(init_task, 5);
 	init_task->pending_unblocks = 0;
 	init_task->father = NULL;
 
@@ -108,6 +110,7 @@ void init_sched()
 {
 	INIT_LIST_HEAD(&ready_queue);
 	INIT_LIST_HEAD(&free_queue);
+	INIT_LIST_HEAD(&blocked);
 
 	for (int i = 0; i < NR_TASKS; ++i) {
 		list_add(&task[i].task.list, &free_queue);
@@ -137,34 +140,49 @@ void inner_task_switch(union task_union *new) {
 }
 
 void update_sched_data_rr() {
-	current()->quantum--;
+	--quantum_global;
 }
 
 int needs_sched_rr() {
-	if (current()->quantum <= 0 && !list_empty(&ready_queue)) {
-		return 1;
-	}
-	if (current()->quantum <= 0) {
-		current()->quantum = 5;
+	if (quantum_global <= 0) {
+		if (!list_empty(&ready_queue)) {
+			return 1;
+		}
+		else {
+			quantum_global = get_quantum(current());		
+		}
 	}
 	return 0;
 }
 
 void update_process_state_rr(struct task_struct *t, struct list_head *dest) {
 	if(t != idle_task){
-		list_add_tail(&t->list, dest);
+		if (t != current()) {
+			list_del(&t->list);
+		}
+		if (dest != NULL) {
+			list_add_tail(&t->list, dest);
+		}
 	}
+	
 }
 
 void sched_next_rr() {
-	struct task_struct *t;
-	struct list_head* l = list_first(&ready_queue);
-	t = list_head_to_task_struct(l);
-	list_del(l);
-	t->quantum = 5;
-	
-	task_switch((union task_union*)t);
-} 
+    struct task_struct *t;
+
+    if (list_empty(&ready_queue)) {
+        t = idle_task;  // No hay procesos listos, entra el proceso idle
+    }
+	else {
+        struct list_head* l = list_first(&ready_queue);
+        t = list_head_to_task_struct(l);
+		update_process_state_rr(t, NULL);
+    }
+
+    quantum_global = get_quantum(t);
+    task_switch((union task_union*)t);
+}
+
 
 void schedule() {
 	update_sched_data_rr();
@@ -180,4 +198,14 @@ int get_quantum (struct task_struct *t){
 }
 void set_quantum (struct task_struct *t, int new_quantum){
 	t->quantum = new_quantum;
+}
+
+int is_in_blocked(struct task_struct *t) {
+    struct list_head *pos, *tmp;
+    list_for_each_safe(pos, tmp, &blocked) {
+        if (pos == &t->list) {
+            return 1; // Está en la lista de bloqueados
+        }
+    }
+    return 0; // No está
 }

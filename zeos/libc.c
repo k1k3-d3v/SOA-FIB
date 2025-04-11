@@ -86,6 +86,9 @@ void perror() {
         case EAGAIN:
             zeos_strcpy(buff, "\nResource temporarily unavailable\n");
             break;
+        case ESRCH:
+            zeos_strcpy(buff, "\nNo such process\n");
+            break;
     }
 
     write(1, buff, strlen(buff));

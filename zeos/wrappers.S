@@ -221,7 +221,7 @@ ENTRY(unblock)
     pushl %ecx
     pushl %edx
 
-    movl 0x08(%ebp), %edx
+    movl 8(%ebp), %edx
 
     movl $22, %eax     
 

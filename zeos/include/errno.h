@@ -9,6 +9,6 @@
 #define EFAULT 14
 #define ENOMEM 12
 #define EAGAIN 11
-
+#define ESRCH 3
 
 #endif /* _ERRNO_H */

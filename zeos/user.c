@@ -5,6 +5,7 @@ extern int addASM(int a, int b);
 char buff[24];
 
 int pid;
+
 char array[100];
 
 int add(int par1, int par2) {
@@ -25,8 +26,18 @@ int __attribute__ ((__section__(".text.main")))
   *p = 0;
   */
 
-  //TEST FORK/SCHEDULER
-  int pid = fork();
+  /*
+  while (1) {
+    for (int i = 0; i < 100000000; i++) {
+      asm volatile("nop");
+    }
+    if (pid == 0) {
+      write(1, "El proceso hijo ha hecho exit\n", 30);
+      exit();
+    }
+  }
+  */
+
   
   /*
   while(1) {
@@ -43,21 +54,56 @@ int __attribute__ ((__section__(".text.main")))
   } 
   */
 
-  //TEST BLOCK/UNBLOCK
-  if (pid == 0) {
-    // Child process
-    write(1, "Child process: Blocking itself\n", 31);
-    block(); // Child blocks itself
-    write(1, "Child process: Unblocked by parent\n", 36);
-  } else if (pid > 0) {
-    // Parent process
-    write(1, "Parent process: Waiting before unblocking child\n", 48);
-    for (int i = 0; i < 100000000; i++) {
+   //TEST FORK
+   //pid = fork();
+
+  /*TEST BLOCK/UNBLOCK
+  if (pid > 0)  {
+    write(1, "[PADRE] Desbloqueando hijo\n", 27);
+
+		int block = unblock(pid);
+
+		if (block < 0) {
+      write(1,"FALLO_UNBLOCK\n",14);
+    }
+    else {
+      write(1,"BIEN_UNBLOCK\n",13);
+    }
+	}
+	else if (pid == 0){
+    for (int i = 0; i < 10000000; i++) {
       asm volatile("nop");
     }
-    write(1, "Parent process: Unblocking child\n", 34);
-    unblock(pid); // Parent unblocks the child
-  }
+    write(1, "[HIJO] Me bloqueo\n", 18);
+		block();
+		write(1, "[HIJO] UNBLOCKED\n", 17);
+	}
+  */
+
+  /*
+  if (pid > 0)  {
+
+    for (int i = 0; i < 10000000; i++) {
+      asm volatile("nop");
+    }
+
+    write(1, "[PADRE] Desbloqueando hijo\n", 27);
+
+		int block = unblock(pid);
+
+		if (block < 0) {
+      write(1,"FALLO_UNBLOCK\n",14);
+    }
+    else {
+      write(1,"BIEN_UNBLOCK\n",13);
+    }
+	}
+	else if (pid == 0){
+    write(1, "[HIJO] Me bloqueo\n", 18);
+		block();
+		write(1, "[HIJO] UNBLOCKED\n", 17);
+	}
+  */
  
   while(1) {}
 }

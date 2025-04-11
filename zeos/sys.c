@@ -109,6 +109,7 @@ int sys_fork (void) {
       t->PID = PID_global++; 
       t->father = current(); 
       t->pending_unblocks = 0; 
+      set_quantum(t, 5); // Establecemos el quantum del proceso hijo
       INIT_LIST_HEAD(&t->anchor); 
       INIT_LIST_HEAD(&t->childs);
 
@@ -147,12 +148,14 @@ void sys_exit()
 
   if (!list_empty(&t->anchor)) list_del(&t->anchor);
 
-  // Eliminar referencias de los hijos
+  extern struct task_struct *idle_task;
+
   struct list_head *e, *tmp;
   list_for_each_safe(e, tmp, &(t->childs)) {
     struct task_struct* ts = list_head_to_task_struct(e);
-    ts->father = NULL;
-    list_del(&ts->anchor);
+    ts->father = idle_task;
+    list_del(&ts->anchor); // Eliminar de hijos del proceso actual
+    list_add_tail(&ts->anchor, &(idle_task->childs)); // Añadir a hijos del idle
   }
 
   update_process_state_rr(t, &free_queue);
@@ -221,33 +224,37 @@ int sys_write(int fd, char *buffer, int size)
   return size - bytes; // Devuelve el número de bytes escritos
 }
 
+
 void sys_block(void) {
-  if(current() != init_task) {
-    current()->pending_unblocks = current()->pending_unblocks -1;
-    if (current()->pending_unblocks <= 0) {
-      current()->pending_unblocks = 1;
+  if (current()->PID != 0) { //Comprobamos que no sea el proceso init
+    if (current()->pending_unblocks > 0) {
+      current()->pending_unblocks = current()->pending_unblocks -1;
+    } 
+    else {
       update_process_state_rr(current(), &blocked);
       sched_next_rr();
-    } 
+    }
   }
 }
 
+
 int sys_unblock(int pid) {
-    struct list_head *tmp = &(current()->childs);
-    struct list_head *e = tmp->next;
+  struct list_head *tmp, *e;
+  list_for_each_safe(e, tmp, &(current()->childs)) {
+    struct task_struct* t = list_entry(e, struct task_struct, anchor);
 
-    while (e != tmp) {
-        struct task_struct* t = list_entry(e, struct task_struct, anchor);
-        
-        if (t->PID == pid && t->pending_unblocks > 0) {
-          update_process_state_rr(t, &ready_queue);
-          return 0;
-        }
-        else if (t->PID == pid) {
-            t->pending_unblocks++;
-        }
-
-        e = e->next; // Avanzar al siguiente elemento
+    if (t->PID == pid) {
+      // Comprobamos si está en la cola de bloqueados
+      if (is_in_blocked(t) && t != current()) {
+        update_process_state_rr(t, &ready_queue);
+        t->pending_unblocks = 0;
+      }
+      else {
+        t->pending_unblocks++;
+      }
+      return 0;
     }
-    return 0;
+  }
+
+  return -1; // No se encontró ningún hijo con ese PID
 }
