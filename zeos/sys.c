@@ -130,35 +130,35 @@ int sys_fork (void) {
 
 void sys_exit()
 {
-  if(sys_getpid() == 1) return; //Comprobamos que no es el proceso init
-    struct task_struct* t = current();
-	  page_table_entry *entry = t->dir_pages_baseAddr;
+  if(sys_getpid() == 1) return; // Comprobamos que no es el proceso init
 
-  //Liberar memoria
-	for (int i = 0; i < NUM_PAG_DATA; ++i) {
-		free_frame(get_frame(entry, i + NUM_PAG_KERNEL));
-		del_ss_pag(entry, i + NUM_PAG_KERNEL);
-	}
+  struct task_struct* t = current();
+  page_table_entry *entry = t->dir_pages_baseAddr;
 
-	t->PID = -1;
-	t->dir_pages_baseAddr = NULL;
-  t->father = NULL;
-
-  if (t->anchor.next == NULL && t->anchor.prev == NULL) list_del(&t->anchor);
-
-  struct list_head * e = list_first(&(current()->childs));
-
-  if (!list_empty(&(current()->childs))) {
-    list_for_each(e, &(current()->childs)) {
-      struct task_struct* ts = list_head_to_task_struct(e);
-      ts->father = NULL;
-      list_del(&ts->anchor);
-    }
+  // Liberar memoria
+  for (int i = 0; i < NUM_PAG_DATA; ++i) {
+    free_frame(get_frame(entry, i + NUM_PAG_KERNEL));
+    del_ss_pag(entry, i + NUM_PAG_KERNEL);
   }
 
-	update_process_state_rr(t, &free_queue);
-	sched_next_rr();
+  t->PID = -1;
+  t->dir_pages_baseAddr = NULL;
+  t->father = NULL;
+
+  if (!list_empty(&t->anchor)) list_del(&t->anchor);
+
+  // Eliminar referencias de los hijos
+  struct list_head *e, *tmp;
+  list_for_each_safe(e, tmp, &(t->childs)) {
+    struct task_struct* ts = list_head_to_task_struct(e);
+    ts->father = NULL;
+    list_del(&ts->anchor);
+  }
+
+  update_process_state_rr(t, &free_queue);
+  sched_next_rr();
 }
+
 
 int sys_gettime()
 {
@@ -240,8 +240,8 @@ int sys_unblock(int pid) {
         struct task_struct* t = list_entry(e, struct task_struct, anchor);
         
         if (t->PID == pid && t->pending_unblocks > 0) {
-            update_process_state_rr(t, &ready_queue);
-            return 0;
+          update_process_state_rr(t, &ready_queue);
+          return 0;
         }
         else if (t->PID == pid) {
             t->pending_unblocks++;

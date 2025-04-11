@@ -27,7 +27,8 @@ int __attribute__ ((__section__(".text.main")))
 
   //TEST FORK/SCHEDULER
   int pid = fork();
-
+  
+  /*
   while(1) {
     if(getpid() >= 1000) {
       write(1, "Soy el hijo\n", 12);
@@ -39,9 +40,10 @@ int __attribute__ ((__section__(".text.main")))
       exit();
       exit();
     }
-  }  
+  } 
+  */
 
-  /*TEST BLOCK/UNBLOCK
+  //TEST BLOCK/UNBLOCK
   if (pid == 0) {
     // Child process
     write(1, "Child process: Blocking itself\n", 31);
@@ -56,7 +58,6 @@ int __attribute__ ((__section__(".text.main")))
     write(1, "Parent process: Unblocking child\n", 34);
     unblock(pid); // Parent unblocks the child
   }
-  */
  
   while(1) {}
 }
