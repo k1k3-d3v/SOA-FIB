@@ -17,9 +17,9 @@
 /**                                              **/
 /** Stack layout in 'systemCall':                **/
 /**                                              **/
-/**   0(%esp) - %edx    \                        **/
+/**   0(%esp) - %ebx    \                        **/
 /**   4(%esp) - %ecx     |                       **/
-/**   8(%esp) - %ebx     |                       **/
+/**   8(%esp) - %edx     |                       **/
 /**   C(%esp) - %esi     | Register saved        **/
 /**  10(%esp) - %edi     |  by 'save'            **/
 /**  14(%esp) - %ebp     |                       **/
@@ -37,91 +37,83 @@
 /**************************************************/
 
 #define SAVE_ALL \
-      	pushl %gs; \
-      	pushl %fs; \
-      	pushl %es; \
-      	pushl %ds; \
-      	pushl %eax; \
-      	pushl %ebp; \
-      	pushl %edi; \
-      	pushl %esi; \
-      	pushl %ebx; \
-     	pushl %ecx; \
-      	pushl %edx; \
-      	movl $__KERNEL_DS, %edx;    \
-      	movl %edx, %ds;           \
-      	movl %edx, %es
+      pushl %gs; \
+      pushl %fs; \
+      pushl %es; \
+      pushl %ds; \
+      pushl %eax; \
+      pushl %ebp; \
+      pushl %edi; \
+      pushl %esi; \
+      pushl %edx; \
+      pushl %ecx; \
+      pushl %ebx; \
+      movl $__KERNEL_DS, %edx;    \
+      movl %edx, %ds;           \
+      movl %edx, %es
 
 #define RESTORE_ALL \
-      	popl %edx; \
-		popl %ecx; \
-		popl %ebx; \
-		popl %esi; \
-		popl %edi; \
-		popl %ebp; \
-		popl %eax; \
-		popl %ds; \
-		popl %es; \
-		popl %fs; \
-		popl %gs;
+      popl %ebx;   \
+      popl %ecx;   \
+      popl %edx;   \
+      popl %esi;   \
+      popl %edi;   \
+      popl %ebp;   \
+      popl %eax;   \
+      popl %ds;    \
+      popl %es;    \
+      popl %fs;    \
+      popl %gs;
 
-#define EOI	 \
-movb $0x20, %al ; \
-outb %al, $0x20 ;
-
-
-ENTRY(keyboard_handler)
-	SAVE_ALL
-	call keyboard_routine
-	EOI
-	RESTORE_ALL
-	iret
+#define EOI \
+      movb $0x20, %al; \
+      outb %al, $0x20;
 
 ENTRY(clock_handler)
-	SAVE_ALL
-	EOI
-	call clock_routine
-	RESTORE_ALL
-	iret
+      SAVE_ALL
+      pushl %eax;
+      call user_to_system;
+      popl %eax;
+      EOI
+      call clock_routine;
+      pushl %eax;
+      call system_to_user;
+      popl %eax;
+      RESTORE_ALL
+      iret;
 
-ENTRY(pf_handler)
-	call pf_routine
+ENTRY(keyboard_handler)
+      SAVE_ALL
+      pushl %eax;
+      call user_to_system;
+      popl %eax;
+      EOI
+      call keyboard_routine;
+      pushl %eax;
+      call system_to_user;
+      popl %eax;
+      RESTORE_ALL
+      iret;
 
-ENTRY(syscall_handler_sysenter)
+ENTRY(system_call_handler)
 	push $__USER_DS
 	push %ebp
 	pushfl
 	push $__USER_CS
 	push 4(%ebp)
-	SAVE_ALL
+	SAVE_ALL	// What about arg 6?
 	cmpl $0, %eax
 	jl sysenter_err
 	cmpl $MAX_SYSCALL, %eax
 	jg sysenter_err
 	call *sys_call_table(, %eax, 0x04)
 	jmp sysenter_fin
-
 sysenter_err:
 	movl $-ENOSYS, %eax
-
 sysenter_fin:
 	movl %eax, 0x18(%esp)
 	RESTORE_ALL
-	movl (%esp), %edx
-	movl 12(%esp), %ecx
+	movl (%esp), %edx // Return address
+	movl 12(%esp), %ecx	      // User stack address
 	sti
-	sysexit	
-
-ENTRY(writeMSR)
-	pushl %ebp
-	movl %esp, %ebp
-
-	movl 8(%ebp), %ecx  //parte baja
-	movl $0, %edx 		//parte alta
-
-	movl 12(%ebp), %eax
-	wrmsr
-
-	movl %ebp, %esp
-	popl %ebp
-	ret
+	sysexit

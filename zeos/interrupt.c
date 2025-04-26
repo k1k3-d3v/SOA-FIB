@@ -6,32 +6,21 @@
 #include <segment.h>
 #include <hardware.h>
 #include <io.h>
-#include <zeos_interrupt.h>
 #include <sched.h>
-
+#include <zeos_interrupt.h>
+#include <keyboard.h>
 
 Gate idt[IDT_ENTRIES];
 Register    idtR;
 
-extern void keyboard_handler();
-extern void clock_handler();
-extern void pf_handler();
-extern void syscall_handler_sysenter();
-
-//extern union task_union * child_union_global;
-//struct task_struct * father_struct;
-
-
-int zeos_ticks = 0;
-
 char char_map[] =
 {
   '\0','\0','1','2','3','4','5','6',
-  '7','8','9','0','\'','¡','\0','\0',
+  '7','8','9','0','\'','�','\0','\0',
   'q','w','e','r','t','y','u','i',
   'o','p','`','+','\0','\0','a','s',
-  'd','f','g','h','j','k','l','ñ',
-  '\0','º','\0','ç','z','x','c','v',
+  'd','f','g','h','j','k','l','�',
+  '\0','�','\0','�','z','x','c','v',
   'b','n','m',',','.','-','\0','*',
   '\0','\0','\0','\0','\0','\0','\0','\0',
   '\0','\0','\0','\0','\0','\0','\0','7',
@@ -40,6 +29,47 @@ char char_map[] =
   '\0','\0','\0','\0','\0','\0','\0','\0',
   '\0','\0'
 };
+
+unsigned char key_state[NUM_KEYS] = {0};
+extern struct list_head blocked; // lista de procesos bloqueados
+
+int zeos_ticks = 0;
+
+void clock_routine()
+{
+  zeos_show_clock();
+  zeos_ticks++;
+
+  // Recorremos la lista de procesos bloqueados
+  struct list_head *pos, *n;
+  list_for_each_safe(pos, n, &blocked) {
+    struct task_struct *p = list_entry(pos, struct task_struct, list);
+    if (zeos_ticks >= p->wake_up_tick) {
+      list_del(pos);              // Lo quitamos de blocked
+      p->state = ST_READY;         // Lo ponemos como listo
+      list_add_tail(&(p->list), &readyqueue); // Lo metemos en readyqueue
+    }
+  }
+
+  schedule();
+}
+
+void keyboard_routine()
+{
+    unsigned char c = inb(0x60);
+    unsigned char code = c & 0x7F;  
+
+    if (code >= NUM_KEYS) return;   // seguridad: no salirse del array
+
+    if (c & 0x80) {                  // BREAK CODE (tecla soltada)
+        key_state[code] = 0;      
+        printc_xy(0, 0, char_map[code]);
+    }
+    else {                           // MAKE CODE (tecla pulsada)
+        key_state[code] = 1;
+    }
+}
+
 
 void setInterruptHandler(int vector, void (*handler)(), int maxAccessibleFromPL)
 {
@@ -74,7 +104,7 @@ void setTrapHandler(int vector, void (*handler)(), int maxAccessibleFromPL)
   /***********************************************************************/
   Word flags = (Word)(maxAccessibleFromPL << 13);
 
-  //flags |= 0x8F00;    /* P = 1, D = 1, Type = 1111 (Trap Gate)*/
+  //flags |= 0x8F00;    /* P = 1, D = 1, Type = 1111 (Trap Gate) */
   /* Changed to 0x8e00 to convert it to an 'interrupt gate' and so
      the system calls will be thread-safe. */
   flags |= 0x8E00;    /* P = 1, D = 1, Type = 1110 (Interrupt Gate) */
@@ -85,80 +115,33 @@ void setTrapHandler(int vector, void (*handler)(), int maxAccessibleFromPL)
   idt[vector].highOffset      = highWord((DWord)handler);
 }
 
+void clock_handler();
+void keyboard_handler();
+void system_call_handler();
+
+void setMSR(unsigned long msr_number, unsigned long high, unsigned long low);
+
+void setSysenter()
+{
+  setMSR(0x174, 0, __KERNEL_CS);
+  setMSR(0x175, 0, INITIAL_ESP);
+  setMSR(0x176, 0, (unsigned long)system_call_handler);
+}
+
 void setIdt()
 {
   /* Program interrups/exception service routines */
   idtR.base  = (DWord)idt;
   idtR.limit = IDT_ENTRIES * sizeof(Gate) - 1;
+  
   set_handlers();
 
   /* ADD INITIALIZATION CODE FOR INTERRUPT VECTOR */
-  setInterruptHandler(33, keyboard_handler, 0);
   setInterruptHandler(32, clock_handler, 0);
-  setInterruptHandler(14, pf_handler, 0);
+  setInterruptHandler(33, keyboard_handler, 0);
 
-  //Inicializacion registros MSR
-  writeMSR(0x174, __KERNEL_CS);
-  writeMSR(0x175, INITIAL_ESP);
-  writeMSR(0x176, (unsigned long)syscall_handler_sysenter);
+  setSysenter();
 
   set_idt_reg(&idtR);
 }
 
-void keyboard_routine()
-{
-  Byte total_code = inb(0x60); //Lectura de la tecla
-  Byte is_make = (total_code & 0x80);
-  Byte code = (total_code & 0x7F);
-
-  if (is_make <= 0) {
-    char c = char_map[code];
-    if (total_code >= sizeof(char_map) || c == '\0') c = 'C';
-
-    printc_xy(0x00, 0x00, c); //Mostrar caracter en la zona superior izquierda
-  }
-}
-
-void clock_routine()
-{
-  ++zeos_ticks;
-  zeos_show_clock();
-
-  schedule();
-  
-  /*TEST FORK
-  if (zeos_ticks % 10 == 0) {
-    if(current()->PID == 1000) {
-      printk("Soy el hijo\n");
-      task_switch((union task_union*)father_struct);
-    }
-    else {
-      printk("Yo soy tu padre\n");
-      task_switch(child_union_global);
-    }
-  }
-  */
-
-  /*
-  int pid = current()->PID;
-  char pid_str[10];
-  itoa(pid, pid_str, 10);
-  printk("Current PID: ");
-  printk(pid_str);
-  printk("\n");
-  */
-  
-}
-
-void pf_routine(int error, int address)
-{
-  char digit[] = "0123456789abcdef";
- 
-   printk( "\n\nProcess generates a PAGE FAULT exception at EIP: 0x" );
- 
-   for (int i = 32; i >= 0; i -= 4) printc(digit[(address >> i) & 0xF]);
-     
-   printk( "\n\nApplying general protection fault...\n" );
- 
-       while (1);
-}

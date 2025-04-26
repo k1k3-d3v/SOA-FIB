@@ -13,248 +13,262 @@
 
 #include <sched.h>
 
+#include <p_stats.h>
+
 #include <errno.h>
 
-#include <list.h>
+#include <keyboard.h>
+
 #define LECTURA 0
 #define ESCRIPTURA 1
-#define BLOCK 128
 
-char buff[128];
+extern struct list_head blocked; // lista de procesos bloqueados
 
-extern int zeos_ticks;
-
-extern struct list_head free_queue;
-extern struct list_head ready_queue;
-extern struct list_head blocked;
-
-// union task_union * child_union_global;
-// extern struct task_struct * father_struct;
-
-extern unsigned int get_ebp();
-
-int PID_global = 1000;
+void * get_ebp();
 
 int check_fd(int fd, int permissions)
 {
-  if (fd != 1)
-    return -9; /*EBADF*/
-  if (permissions != ESCRIPTURA)
-    return -13; /*EACCES*/
+  if (fd!=1) return -EBADF; 
+  if (permissions!=ESCRIPTURA) return -EACCES; 
   return 0;
+}
+
+void user_to_system(void)
+{
+  update_stats(&(current()->p_stats.user_ticks), &(current()->p_stats.elapsed_total_ticks));
+}
+
+void system_to_user(void)
+{
+  update_stats(&(current()->p_stats.system_ticks), &(current()->p_stats.elapsed_total_ticks));
 }
 
 int sys_ni_syscall()
 {
-  return -38; /*ENOSYS*/
+	return -ENOSYS; 
 }
 
 int sys_getpid()
 {
-  return current()->PID;
+	return current()->PID;
 }
+
+int global_PID=1000;
 
 int ret_from_fork()
 {
   return 0;
 }
 
-int sys_fork (void) {
-  // Comprobamos si hay procesos libres en la cola de procesos libres
-  if (!list_empty(&free_queue)) {
-      // Obtenemos el primer elemento de la cola de procesos libres
-      struct list_head *l = list_first(&free_queue);
-      list_del(l); // Lo eliminamos de la cola
-      struct task_struct *t = list_head_to_task_struct(l); // Obtenemos la estructura del proceso
-
-      // Copiamos los datos del proceso actual al nuevo proceso
-      copy_data(current(), t, sizeof(union task_union));
-      allocate_DIR(t);
-
-      int pages[NUM_PAG_DATA]; // Array para almacenar los frames asignados
-
-      // Asignamos frames para las páginas de datos del proceso hijo
-      for (int i = 0; i < NUM_PAG_DATA; ++i) {
-          pages[i] = alloc_frame();
-          if (pages[i] < 0) { // Si no se pueden asignar frames, liberamos los ya asignados
-              for (int j = 0; j <= i; ++j) {
-                  free_frame(pages[j]);
-              }
-              list_add_tail(&t->list, &free_queue); // Devolvemos el proceso a la cola de libres
-                return -ENOMEM; // Error al asignar frames
-          }
-      }
-
-      // Compartimos las páginas de kernel entre el padre y el hijo
-      for (int i = 0; i < NUM_PAG_KERNEL; ++i) {
-          set_ss_pag(get_PT(t), i, get_frame(get_PT(current()), i));
-      }
-
-      // Asignamos las páginas de datos al hijo y copiamos los datos del padre
-      for (int i = 0; i < NUM_PAG_DATA; ++i) {
-          set_ss_pag(get_PT(t), i + NUM_PAG_KERNEL, pages[i]);                                                                          // Asignamos la página al hijo
-          set_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE, pages[i]);                                    // Temporalmente al padre
-          copy_data((void*)((i + NUM_PAG_KERNEL) << 12), (void*)((i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE) << 12), PAGE_SIZE); // Copiamos los datos
-          del_ss_pag(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA + NUM_PAG_CODE);                                              // Eliminamos la asignación temporal
-      }
-
-      // Compartimos las páginas de código entre el padre y el hijo
-      for (int i = 0; i < NUM_PAG_CODE; ++i) {
-          set_ss_pag(get_PT(t), i + NUM_PAG_KERNEL + NUM_PAG_DATA , get_frame(get_PT(current()), i + NUM_PAG_KERNEL + NUM_PAG_DATA ));
-      }
-
-      set_cr3(get_DIR(current())); // Restauramos el directorio de páginas del padre con un flush del TLB
-
-      // Inicializamos los valores del proceso hijo
-      t->PID = PID_global++; 
-      t->father = current(); 
-      t->pending_unblocks = 0; 
-      set_quantum(t, 5); // Establecemos el quantum del proceso hijo
-      INIT_LIST_HEAD(&t->anchor); 
-      INIT_LIST_HEAD(&t->childs);
-
-      // Configuramos la pila del kernel para el proceso hijo
-      union task_union *tu = (union task_union*) t;
-      tu->stack[KERNEL_STACK_SIZE - 19] = (unsigned long) 0;              // Valor de retorno
-      tu->stack[KERNEL_STACK_SIZE - 18] = (unsigned long) ret_from_fork;  // Dirección de retorno
-      t->kernel_esp = (unsigned long) &tu->stack[KERNEL_STACK_SIZE - 19]; // Apuntamos al nuevo ESP
-
-      // Añadimos el proceso hijo a la cola de listos y a la lista de hijos del padre
-      list_add_tail(&t->list, &ready_queue);
-      list_add_tail(&t->anchor, &(current()->childs));
-
-      return t->PID;
-  }
-  
-  return -EAGAIN; // Error si no hay procesos libres
-}
-
-void sys_exit()
+int sys_fork(void)
 {
-  if(sys_getpid() == 1) return; // Comprobamos que no es el proceso init
+  struct list_head *lhcurrent = NULL;
+  union task_union *uchild;
+  
+  /* Any free task_struct? */
+  if (list_empty(&freequeue)) return -ENOMEM;
 
-  struct task_struct* t = current();
-  page_table_entry *entry = t->dir_pages_baseAddr;
-
-  // Liberar memoria
-  for (int i = 0; i < NUM_PAG_DATA; ++i) {
-    free_frame(get_frame(entry, i + NUM_PAG_KERNEL));
-    del_ss_pag(entry, i + NUM_PAG_KERNEL);
+  lhcurrent=list_first(&freequeue);
+  
+  list_del(lhcurrent);
+  
+  uchild=(union task_union*)list_head_to_task_struct(lhcurrent);
+  
+  /* Copy the parent's task struct to child's */
+  copy_data(current(), uchild, sizeof(union task_union));
+  
+  /* new pages dir */
+  allocate_DIR((struct task_struct*)uchild);
+  
+  /* Allocate pages for DATA+STACK */
+  int new_ph_pag, pag, i;
+  page_table_entry *process_PT = get_PT(&uchild->task);
+  for (pag=0; pag<NUM_PAG_DATA; pag++)
+  {
+    new_ph_pag=alloc_frame();
+    if (new_ph_pag!=-1) /* One page allocated */
+    {
+      set_ss_pag(process_PT, PAG_LOG_INIT_DATA+pag, new_ph_pag);
+    }
+    else /* No more free pages left. Deallocate everything */
+    {
+      /* Deallocate allocated pages. Up to pag. */
+      for (i=0; i<pag; i++)
+      {
+        free_frame(get_frame(process_PT, PAG_LOG_INIT_DATA+i));
+        del_ss_pag(process_PT, PAG_LOG_INIT_DATA+i);
+      }
+      /* Deallocate task_struct */
+      list_add_tail(lhcurrent, &freequeue);
+      
+      /* Return error */
+      return -EAGAIN; 
+    }
   }
 
-  t->PID = -1;
-  t->dir_pages_baseAddr = NULL;
-  t->father = NULL;
-
-  if (!list_empty(&t->anchor)) list_del(&t->anchor);
-
-  extern struct task_struct *idle_task;
-
-  struct list_head *e, *tmp;
-  list_for_each_safe(e, tmp, &(t->childs)) {
-    struct task_struct* ts = list_head_to_task_struct(e);
-    ts->father = idle_task;
-    list_del(&ts->anchor); // Eliminar de hijos del proceso actual
-    list_add_tail(&ts->anchor, &(idle_task->childs)); // Añadir a hijos del idle
+  /* Copy parent's SYSTEM and CODE to child. */
+  page_table_entry *parent_PT = get_PT(current());
+  for (pag=0; pag<NUM_PAG_KERNEL; pag++)
+  {
+    set_ss_pag(process_PT, pag, get_frame(parent_PT, pag));
   }
+  for (pag=0; pag<NUM_PAG_CODE; pag++)
+  {
+    set_ss_pag(process_PT, PAG_LOG_INIT_CODE+pag, get_frame(parent_PT, PAG_LOG_INIT_CODE+pag));
+  }
+  /* Copy parent's DATA to child. We will use TOTAL_PAGES-1 as a temp logical page to map to */
+  for (pag=NUM_PAG_KERNEL+NUM_PAG_CODE; pag<NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; pag++)
+  {
+    /* Map one child page to parent's address space. */
+    set_ss_pag(parent_PT, pag+NUM_PAG_DATA, get_frame(process_PT, pag));
+    copy_data((void*)(pag<<12), (void*)((pag+NUM_PAG_DATA)<<12), PAGE_SIZE);
+    del_ss_pag(parent_PT, pag+NUM_PAG_DATA);
+  }
+  /* Deny access to the child's memory space */
+  set_cr3(get_DIR(current()));
 
-  update_process_state_rr(t, &free_queue);
-  sched_next_rr();
+  uchild->task.PID=++global_PID;
+  uchild->task.state=ST_READY;
+
+  int register_ebp;		/* frame pointer */
+  /* Map Parent's ebp to child's stack */
+  register_ebp = (int) get_ebp();
+  register_ebp=(register_ebp - (int)current()) + (int)(uchild);
+
+  uchild->task.register_esp=register_ebp + sizeof(DWord);
+
+  DWord temp_ebp=*(DWord*)register_ebp;
+  /* Prepare child stack for context switch */
+  uchild->task.register_esp-=sizeof(DWord);
+  *(DWord*)(uchild->task.register_esp)=(DWord)&ret_from_fork;
+  uchild->task.register_esp-=sizeof(DWord);
+  *(DWord*)(uchild->task.register_esp)=temp_ebp;
+
+  /* Set stats to 0 */
+  init_stats(&(uchild->task.p_stats));
+
+  /* Queue child process into readyqueue */
+  uchild->task.state=ST_READY;
+  list_add_tail(&(uchild->task.list), &readyqueue);
+  
+  return uchild->task.PID;
 }
 
+#define TAM_BUFFER 512
+
+int sys_write(int fd, char *buffer, int nbytes) {
+char localbuffer [TAM_BUFFER];
+int bytes_left;
+int ret;
+
+	if ((ret = check_fd(fd, ESCRIPTURA)))
+		return ret;
+	if (nbytes < 0)
+		return -EINVAL;
+	if (!access_ok(VERIFY_READ, buffer, nbytes))
+		return -EFAULT;
+	
+	bytes_left = nbytes;
+	while (bytes_left > TAM_BUFFER) {
+		copy_from_user(buffer, localbuffer, TAM_BUFFER);
+		ret = sys_write_console(localbuffer, TAM_BUFFER);
+		bytes_left-=ret;
+		buffer+=ret;
+	}
+	if (bytes_left > 0) {
+		copy_from_user(buffer, localbuffer,bytes_left);
+		ret = sys_write_console(localbuffer, bytes_left);
+		bytes_left-=ret;
+	}
+	return (nbytes-bytes_left);
+}
+
+
+extern int zeos_ticks;
 
 int sys_gettime()
 {
   return zeos_ticks;
 }
 
-int sys_write(int fd, char *buffer, int size)
+void sys_exit()
+{  
+  int i;
+
+  page_table_entry *process_PT = get_PT(current());
+
+  // Deallocate all the propietary physical pages
+  for (i=0; i<NUM_PAG_DATA; i++)
+  {
+    free_frame(get_frame(process_PT, PAG_LOG_INIT_DATA+i));
+    del_ss_pag(process_PT, PAG_LOG_INIT_DATA+i);
+  }
+  
+  /* Free task_struct */
+  list_add_tail(&(current()->list), &freequeue);
+  
+  current()->PID=-1;
+  
+  /* Restarts execution of the next process */
+  sched_next_rr();
+}
+
+/* System call to force a task switch */
+int sys_yield()
 {
-  int error_fd = check_fd(fd, ESCRIPTURA);
-  if (error_fd < 0)
-    return error_fd;
-
-  if (buffer == NULL)
-  {
-    return -EFAULT;
-  }
-
-  if (size < 0)
-  {
-    return -EINVAL;
-  }
-
-  if (access_ok(VERIFY_READ, buffer, size) == 0)
-  {
-    return -EFAULT;
-  }
-
-  int bytes = size;
-  int w_bytes;
-  int offset = 0;
-  int current_size;
-
-  while (bytes > 0)
-  {
-
-    if (bytes > BLOCK)
-    {
-      current_size = BLOCK;
-    }
-    else
-    {
-      current_size = bytes;
-    }
-
-    if (copy_from_user(buffer + offset, buff, current_size) != 0)
-    {
-      return -EFAULT; // Si ocurre un error al copiar, devolvemos un error
-    }
-
-    // Escribir en consola
-    w_bytes = sys_write_console(buff, current_size);
-    if (w_bytes < 0)
-    {
-      return -EIO;
-    }
-
-    offset += current_size;
-    bytes -= w_bytes;
-  }
-  return size - bytes; // Devuelve el número de bytes escritos
+  force_task_switch();
+  return 0;
 }
 
+extern int remaining_quantum;
 
-void sys_block(void) {
-  if (current()->PID != 0) { //Comprobamos que no sea el proceso init
-    if (current()->pending_unblocks > 0) {
-      current()->pending_unblocks = current()->pending_unblocks -1;
-    } 
-    else {
-      update_process_state_rr(current(), &blocked);
-      sched_next_rr();
-    }
-  }
-}
-
-
-int sys_unblock(int pid) {
-  struct list_head *tmp, *e;
-  list_for_each_safe(e, tmp, &(current()->childs)) {
-    struct task_struct* t = list_entry(e, struct task_struct, anchor);
-
-    if (t->PID == pid) {
-      // Comprobamos si está en la cola de bloqueados
-      if (is_in_blocked(t) && t != current()) {
-        update_process_state_rr(t, &ready_queue);
-        t->pending_unblocks = 0;
-      }
-      else {
-        t->pending_unblocks++;
-      }
+int sys_get_stats(int pid, struct stats *st)
+{
+  int i;
+  
+  if (!access_ok(VERIFY_WRITE, st, sizeof(struct stats))) return -EFAULT; 
+  
+  if (pid<0) return -EINVAL;
+  for (i=0; i<NR_TASKS; i++)
+  {
+    if (task[i].task.PID==pid)
+    {
+      task[i].task.p_stats.remaining_ticks=remaining_quantum;
+      copy_to_user(&(task[i].task.p_stats), st, sizeof(struct stats));
       return 0;
     }
   }
-
-  return -1; // No se encontró ningún hijo con ese PID
+  return -ESRCH; /*ESRCH */
 }
+
+int sys_get_keyboard_state(char *user_buf)
+{
+  if (!access_ok(VERIFY_WRITE, user_buf, NUM_KEYS)) {
+    return -EFAULT;
+  }
+  if (copy_to_user(key_state, user_buf, NUM_KEYS) != 0) {
+    return -EFAULT;
+  }
+  return 0;
+}
+
+int sys_pause(int ms)
+{
+  if (ms < 0) return -EINVAL;
+
+  unsigned long ticks = (ms + TICK_MS-1) / TICK_MS;   // redondeo ms → ticks
+  struct task_struct *current_task = current();
+
+  // Guardamos en qué tick hay que despertarlo
+  current_task->wake_up_tick = zeos_ticks + ticks;
+
+  // Cambiamos su estado a BLOQUEADO y lo metemos en la cola blocked
+  current_task->state = ST_BLOCKED;
+  list_add_tail(&(current_task->list), &blocked);
+
+  // Cedemos la CPU
+  schedule();
+
+  return 0; // Cuando despierte, seguirá aquí
+}
+

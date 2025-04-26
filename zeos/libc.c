@@ -3,11 +3,11 @@
  */
 
 #include <libc.h>
-#include <types.h>
-#include <errno.h>
 
+#include <types.h>
 
 int errno;
+int REGS[7]; // Space to save REGISTERS
 
 void itoa(int a, char *b)
 {
@@ -44,58 +44,11 @@ int strlen(char *a)
   return i;
 }
 
-void zeos_strcpy(char *dest, const char *src) {
-    while (*src) {
-        *dest = *src;
-        dest++;
-        src++;
-    }
+void perror()
+{
+  char buffer[256];
 
-    *dest = '\0';
+  itoa(errno, buffer);
+
+  write(1, buffer, strlen(buffer));
 }
-
-
-void perror() {
-    char buff[256];
-
-    switch(errno) {
-        case 0: // No error
-            zeos_strcpy(buff, "\nNo error\n");
-            break;
-        case EIO:
-            zeos_strcpy(buff, "\nInput/output error\n");
-            break;
-        case EBADF:
-            zeos_strcpy(buff, "\nBad file descriptor\n");
-            break;
-        case EACCES:
-            zeos_strcpy(buff, "\nPermission denied\n");
-            break;
-        case ENOSYS:
-            zeos_strcpy(buff, "\nFunction not implemented\n");
-            break;
-        case EINVAL:
-            zeos_strcpy(buff, "\nInvalid argument\n");
-            break;
-        case EFAULT:
-            zeos_strcpy(buff, "\nBad address\n");
-            break;
-        case ENOMEM:
-            zeos_strcpy(buff, "\nOut of memory\n");
-            break;
-        case EAGAIN:
-            zeos_strcpy(buff, "\nResource temporarily unavailable\n");
-            break;
-        case ESRCH:
-            zeos_strcpy(buff, "\nNo such process\n");
-            break;
-    }
-
-    write(1, buff, strlen(buff));
-}
-
-
-
-
-
-

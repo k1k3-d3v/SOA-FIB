@@ -74,8 +74,8 @@ int access_ok(int type, const void * addr, unsigned long size)
   {
     case VERIFY_WRITE:
       /* Should suppose no support for automodifyable code */
-      if ((addr_ini>=USER_FIRST_PAGE)&&
-          (addr_fin<=USER_FIRST_PAGE+NUM_PAG_DATA))
+      if ((addr_ini>=USER_FIRST_PAGE+NUM_PAG_CODE)&&
+          (addr_fin<=USER_FIRST_PAGE+NUM_PAG_CODE+NUM_PAG_DATA))
 	  return 1;
     default:
       if ((addr_ini>=USER_FIRST_PAGE)&&
@@ -129,4 +129,16 @@ unsigned long get_ticks(void) {
         do_div(ticks,CYCLESPERTICK);
 
         return ticks;
+}
+
+void memset(void *s, unsigned char c, int size)
+{
+  unsigned char *m=(unsigned char *)s;
+  
+  int i;
+  
+  for (i=0; i<size; i++)
+  {
+    m[i]=c;
+  }
 }

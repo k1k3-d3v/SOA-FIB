@@ -17,7 +17,4 @@ void setTrapHandler(int vector, void (*handler)(), int maxAccessibleFromPL);
 
 void setIdt();
 
-void writeMSR(unsigned long msr, unsigned long val);
-
-
 #endif  /* __INTERRUPT_H__ */

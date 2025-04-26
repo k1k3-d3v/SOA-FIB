@@ -8,28 +8,23 @@
 #include <list.h>
 #include <types.h>
 #include <mm_address.h>
+#include <stats.h>
+
 
 #define NR_TASKS      10
 #define KERNEL_STACK_SIZE	1024
-
-extern struct task_struct * idle_task;
-extern union task_union * idle_task_union;
-
-extern struct task_struct * init_task;
-extern union task_union * init_task_union;
 
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 
 struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
   page_table_entry * dir_pages_baseAddr;
-  struct list_head list;
-  unsigned long kernel_esp;
-  int quantum;
-  int pending_unblocks;
-  struct task_struct* father;
-  struct list_head childs;
-  struct list_head anchor;
+  struct list_head list;	/* Task struct enqueuing */
+  int register_esp;		/* position in the stack */
+  enum state_t state;		/* State of the process */
+  int total_quantum;		/* Total quantum of the process */
+  struct stats p_stats;		/* Process stats */
+  unsigned long wake_up_tick;
 };
 
 union task_union {
@@ -37,12 +32,17 @@ union task_union {
   unsigned long stack[KERNEL_STACK_SIZE];    /* pila de sistema, per procés */
 };
 
-extern union task_union task[NR_TASKS]; /* Vector de tasques */
+extern union task_union protected_tasks[NR_TASKS+2];
+extern union task_union *task; /* Vector de tasques */
+extern struct task_struct *idle_task;
 
 
 #define KERNEL_ESP(t)       	(DWord) &(t)->stack[KERNEL_STACK_SIZE]
 
 #define INITIAL_ESP       	KERNEL_ESP(&task[1])
+
+extern struct list_head freequeue;
+extern struct list_head readyqueue;
 
 /* Inicialitza les dades del proces inicial */
 void init_task1(void);
@@ -51,15 +51,16 @@ void init_idle(void);
 
 void init_sched(void);
 
+void schedule(void);
+
 struct task_struct * current();
 
 void task_switch(union task_union*t);
+void switch_stack(int * save_sp, int new_sp);
 
-void inner_task_switch(union task_union*t);  //NUEVA CABECERA INNER TASK SWITCH
+void sched_next_rr(void);
 
-extern unsigned int get_ebp();
-
-void stack_change(unsigned int new_esp);
+void force_task_switch(void);
 
 struct task_struct *list_head_to_task_struct(struct list_head *l);
 
@@ -74,9 +75,7 @@ void sched_next_rr();
 void update_process_state_rr(struct task_struct *t, struct list_head *dest);
 int needs_sched_rr();
 void update_sched_data_rr();
-void schedule();
-int get_quantum (struct task_struct *t);
-void set_quantum (struct task_struct *t, int new_quantum);
-int is_in_blocked(struct task_struct *t);
+
+void init_stats(struct stats *s);
 
 #endif  /* __SCHED_H__ */

@@ -8,17 +8,15 @@
 
 #include <stats.h>
 
+extern int errno;
+
 int write(int fd, char *buffer, int size);
 
 void itoa(int a, char *b);
 
-int gettime();
-
 int strlen(char *a);
 
 void perror();
-
-void zeos_strcpy(char *dest, const char *src);
 
 int getpid();
 
@@ -26,8 +24,12 @@ int fork();
 
 void exit();
 
-void block(void);
+int yield();
 
-int unblock(int pid);
+int get_stats(int pid, struct stats *st);
+
+int GetKeyboardState(char *keyboard);
+
+int pause(int milliseconds);
 
 #endif  /* __LIBC_H__ */

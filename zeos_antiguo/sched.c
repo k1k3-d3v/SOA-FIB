@@ -1,0 +1,211 @@
+/*
+* sched.c - initializes struct for task 0 anda task 1
+*/
+
+#include <sched.h>
+#include <mm.h>
+#include <io.h>
+#include <interrupt.h>
+
+struct task_struct * idle_task;
+union task_union * idle_task_union;
+
+struct task_struct * init_task;
+union task_union * init_task_union;
+
+extern struct list_head blocked;
+struct list_head ready_queue;
+struct list_head free_queue;
+
+int quantum_global = 0;
+
+
+union task_union task[NR_TASKS]
+  __attribute__((__section__(".data.task")));
+
+struct task_struct *list_head_to_task_struct(struct list_head *l)
+{
+//return list_entry( l, struct task_struct, list);
+  return (struct task_struct*)((int)l&0xfffff000);
+}
+
+/* get_DIR - Returns the Page Directory address for task 't' */
+page_table_entry * get_DIR (struct task_struct *t) 
+{
+	return t->dir_pages_baseAddr;
+}
+
+/* get_PT - Returns the Page Table address for task 't' */
+page_table_entry * get_PT (struct task_struct *t) 
+{
+	return (page_table_entry *)(((unsigned int)(t->dir_pages_baseAddr->bits.pbase_addr))<<12);
+}
+
+int allocate_DIR(struct task_struct *t) 
+{
+	int pos;
+
+	pos = ((int)t-(int)task)/sizeof(union task_union);
+
+	t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[pos]; 
+
+	return 1;
+}
+
+void cpu_idle(void)
+{
+	__asm__ __volatile__("sti": : :"memory");
+
+	while(1)
+	{
+	;
+	}
+}
+
+void init_idle (void)
+{
+	struct list_head * e = list_first(&free_queue);
+	list_del(e);
+	idle_task = list_head_to_task_struct(e);
+	idle_task_union = (union task_union*)idle_task;
+
+	idle_task->PID = 0;
+	set_quantum(idle_task, 1);
+	idle_task->pending_unblocks = 0;
+	idle_task->father = NULL;
+	
+  	INIT_LIST_HEAD(&idle_task->childs);
+	
+	allocate_DIR(idle_task);
+
+	idle_task_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long) cpu_idle;
+	idle_task_union->stack[KERNEL_STACK_SIZE-2] = (unsigned long) 0;
+
+	idle_task->kernel_esp = (unsigned long) &idle_task_union->stack[KERNEL_STACK_SIZE-2];
+}
+
+void init_task1(void)
+{
+	struct list_head * e1 = list_first(&free_queue);
+	list_del(e1);
+	init_task = list_head_to_task_struct(e1);
+	init_task_union = (union task_union*)init_task;
+
+	init_task->PID = 1;
+	set_quantum(init_task, 5);
+	init_task->pending_unblocks = 0;
+	init_task->father = NULL;
+
+	INIT_LIST_HEAD(&init_task->childs);
+	
+	allocate_DIR(init_task);
+
+	set_user_pages(init_task);
+	tss.esp0 = (unsigned long)&init_task_union->stack[KERNEL_STACK_SIZE];	
+	writeMSR(0x175, (unsigned long)&init_task_union->stack[KERNEL_STACK_SIZE]);
+	set_cr3(init_task->dir_pages_baseAddr);
+}
+
+void init_sched()
+{
+	INIT_LIST_HEAD(&ready_queue);
+	INIT_LIST_HEAD(&free_queue);
+	INIT_LIST_HEAD(&blocked);
+
+	for (int i = 0; i < NR_TASKS; ++i) {
+		list_add(&task[i].task.list, &free_queue);
+	}
+
+}
+
+struct task_struct* current()
+{
+  int ret_value;
+  
+  __asm__ __volatile__(
+  	"movl %%esp, %0"
+	: "=g" (ret_value)
+  );
+  return (struct task_struct*)(ret_value&0xfffff000);
+}
+
+void inner_task_switch(union task_union *new) {
+	tss.esp0 = (unsigned long)&new->stack[KERNEL_STACK_SIZE];
+	writeMSR(0x175, (unsigned long)&new->stack[KERNEL_STACK_SIZE]);
+
+	set_cr3(new->task.dir_pages_baseAddr);
+	current()->kernel_esp = get_ebp();
+	
+	stack_change((unsigned int)new->task.kernel_esp);
+}
+
+void update_sched_data_rr() {
+	--quantum_global;
+}
+
+int needs_sched_rr() {
+	if (quantum_global <= 0) {
+		if (!list_empty(&ready_queue)) {
+			return 1;
+		}
+		else {
+			quantum_global = get_quantum(current());		
+		}
+	}
+	return 0;
+}
+
+void update_process_state_rr(struct task_struct *t, struct list_head *dest) {
+	if(t != idle_task){
+		if (t != current()) {
+			list_del(&t->list);
+		}
+		if (dest != NULL) {
+			list_add_tail(&t->list, dest);
+		}
+	}
+	
+}
+
+void sched_next_rr() {
+    struct task_struct *t;
+
+    if (list_empty(&ready_queue)) {
+        t = idle_task;  // No hay procesos listos, entra el proceso idle
+    }
+	else {
+        struct list_head* l = list_first(&ready_queue);
+        t = list_head_to_task_struct(l);
+		update_process_state_rr(t, NULL);
+    }
+
+    quantum_global = get_quantum(t);
+    task_switch((union task_union*)t);
+}
+
+
+void schedule() {
+	update_sched_data_rr();
+
+	if (needs_sched_rr()) {
+		update_process_state_rr(current(), &ready_queue);
+		sched_next_rr();
+	}
+}
+
+int get_quantum (struct task_struct *t){
+	return t->quantum;
+}
+void set_quantum (struct task_struct *t, int new_quantum){
+	t->quantum = new_quantum;
+}
+
+int is_in_blocked(struct task_struct *t) {
+    struct list_head *pos, *tmp;
+    list_for_each_safe(pos, tmp, &blocked) {
+        if (pos == &t->list) {
+            return 1; // Está en la lista de bloqueados
+        }
+    }
+    return 0; // No está
+}

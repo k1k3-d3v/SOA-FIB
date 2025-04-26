@@ -69,6 +69,9 @@ for (j=0; j< NR_TASKS; j++) {
       pagusr_table[j][i].bits.rw = 1;
       pagusr_table[j][i].bits.present = 1;
     }
+  /* Protect the task array by using a couple of invalid pages before and after the task array */
+  pagusr_table[j][PH_PAGE((DWord)(&protected_tasks[0]))].bits.present = 0;
+  pagusr_table[j][PH_PAGE((DWord)(&protected_tasks[11]))].bits.present = 0;
 }
 }
 
