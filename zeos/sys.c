@@ -254,21 +254,20 @@ int sys_get_keyboard_state(char *user_buf)
 
 int sys_pause(int ms)
 {
-  if (ms < 0) return -EINVAL;
+    if (ms < 0) return -EINVAL;
 
-  unsigned long ticks = (ms + TICK_MS-1) / TICK_MS;   // redondeo ms → ticks
-  struct task_struct *current_task = current();
+    struct task_struct *t = current();
+    unsigned long ticks = (ms + TICK_MS - 1) / TICK_MS;
 
-  // Guardamos en qué tick hay que despertarlo
-  current_task->wake_up_tick = zeos_ticks + ticks;
+    t->wake_up_tick = zeos_ticks + ticks;
 
-  // Cambiamos su estado a BLOQUEADO y lo metemos en la cola blocked
-  current_task->state = ST_BLOCKED;
-  list_add_tail(&(current_task->list), &blocked);
+    /* mover el proceso a la cola blocked y marcarlo BLOQUEADO */
+    update_process_state_rr(t, &blocked);
 
-  // Cedemos la CPU
-  schedule();
+    /* elegir inmediatamente otro proceso */
+    sched_next_rr();      
 
-  return 0; // Cuando despierte, seguirá aquí
+    return 0;
 }
+
 
