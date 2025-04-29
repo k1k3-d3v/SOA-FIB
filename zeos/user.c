@@ -1,17 +1,22 @@
 #include <libc.h>
 
-char buff[24];
+char keymap[128];
 
-int pid;
-
-int __attribute__ ((__section__(".text.main")))
-  main(void)
+int __attribute__((__section__(".text.main"))) main(void)
 {
-    /* Next line, tries to move value 0 to CR3 register. This register is a privileged one, and so it will raise an exception */
-     /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
+    write(1, "Esperando pulsaciones de teclado...\n", 36);
 
-  pause(1000); /* Pause 1 second */
-  write(1, "Hello world!\n", 13); /* Write to stdout */
+    while (1) {
+      GetKeyboardState(keymap);
 
-  while(1) {}
+      for (int i = 0; i < 128; ++i) {
+        if (keymap[i] == 1) {
+          write(1, "Se ha detectado una pulsacion\n", 31);
+        }
+      }
+
+      pause(50);
+    }
+
+    return 0;
 }
