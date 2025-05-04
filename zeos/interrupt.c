@@ -35,22 +35,9 @@ extern struct list_head blocked; // lista de procesos bloqueados
 
 int zeos_ticks = 0;
 
-void clock_routine()
-{
+void clock_routine() {
   zeos_show_clock();
   zeos_ticks++;
-
-  // Recorremos la lista de procesos bloqueados
-  struct list_head *pos, *n;
-  list_for_each_safe(pos, n, &blocked) {
-    struct task_struct *p = list_entry(pos, struct task_struct, list);
-    if (zeos_ticks >= p->wake_up_tick) {
-      list_del(pos);              // Lo quitamos de blocked
-      p->state = ST_READY;         // Lo ponemos como listo
-      list_add_tail(&(p->list), &readyqueue); // Lo metemos en readyqueue
-    }
-  }
-
   schedule();
 }
 

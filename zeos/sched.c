@@ -147,8 +147,25 @@ void sched_next_rr(void)
   task_switch((union task_union*)t);
 }
 
+static void wake_sleeping_tasks(void)
+{
+    struct list_head *pos, *n;
+    extern int zeos_ticks;
+
+    list_for_each_safe(pos, n, &blocked) {
+        struct task_struct *t = list_head_to_task_struct(pos);
+        if (t->wake_up_tick > 0 && zeos_ticks >= t->wake_up_tick) {
+            /* Mueve el proceso de blocked → readyqueue en un único paso */
+            update_process_state_rr(t, &readyqueue);
+            t->wake_up_tick = 0;  /* resetea para no despertarlo otra vez */
+        }
+    }
+}
+
+
 void schedule()
 {
+  wake_sleeping_tasks();
   update_sched_data_rr();
   if (needs_sched_rr())
   {

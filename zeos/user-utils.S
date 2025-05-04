@@ -114,9 +114,11 @@ ENTRY(GetKeyboardState)
 ENTRY(pause)
     pushl %ebp
     movl  %esp, %ebp
+	pushl %ebx
     movl  $37, %eax
     movl  8(%ebp), %ebx
     call syscall_sysenter
+	popl %ebx
     popl  %ebp
     ret
 
