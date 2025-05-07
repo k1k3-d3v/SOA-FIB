@@ -25,6 +25,7 @@ struct task_struct {
   int total_quantum;		/* Total quantum of the process */
   struct stats p_stats;		/* Process stats */
   unsigned long wake_up_tick;
+  int screen_frame;
 };
 
 union task_union {

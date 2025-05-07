@@ -270,4 +270,24 @@ int sys_pause(int ms)
     return 0;
 }
 
+#define PAG_LOG_SCREEN   (PAG_LOG_INIT_DATA + NUM_PAG_DATA)   /* página virtual libre */
+#define USER_VA_SCREEN   (PAG_LOG_SCREEN << 12)               /* dirección lógica   */
 
+void *sys_StartScreen(void)
+{
+    struct task_struct *p = current();        /* PCB del proceso en curso   */
+    if (p->screen_frame != -1)                /* ya tiene página de pantalla*/
+        return (void*)-1;
+
+    int frame = alloc_frame();                /* ← aquí va el código citado */
+    if (frame < 0) return (void*)-1;          /* sin memoria física libre   */
+
+    p->screen_frame = frame;                  /* guarda el nº de frame      */
+
+    /* mapea la página en el PT del proceso */
+    page_table_entry *PT = get_PT(p);
+    set_ss_pag(PT, PAG_LOG_SCREEN, frame);
+    set_cr3(get_DIR(p));                      /* flush TLB                  */
+
+    return (void*)USER_VA_SCREEN;             /* dirección que verá el user */
+}

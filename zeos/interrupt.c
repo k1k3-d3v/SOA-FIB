@@ -12,6 +12,9 @@
 
 Gate idt[IDT_ENTRIES];
 Register    idtR;
+#define FRAME2ADDR(frame) ((char *)((frame) << 12))
+
+
 
 char char_map[] =
 {
@@ -38,6 +41,17 @@ int zeos_ticks = 0;
 void clock_routine() {
   zeos_show_clock();
   zeos_ticks++;
+    struct task_struct *cur = current();
+    if (cur->screen_frame != -1) {
+        // Dirección física del marco:
+        char *src = FRAME2ADDR(cur->screen_frame);
+        char *dst = (char *) 0xB8000;  // Buffer de texto VGA
+        // Copiar 80x25 caracteres (2 bytes c/u = 4000 bytes):contentReference[oaicite:6]{index=6}:
+        for (int i = 0; i < 80*25*2; i++) {
+            dst[i] = src[i];
+        }
+    }
+    schedule();
   schedule();
 }
 
