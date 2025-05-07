@@ -12,9 +12,8 @@
 
 Gate idt[IDT_ENTRIES];
 Register    idtR;
-#define FRAME2ADDR(frame) ((char *)((frame) << 12))
-
-
+unsigned char key_state[NUM_KEYS] = {0};
+extern struct list_head blocked; // lista de procesos bloqueados
 
 char char_map[] =
 {
@@ -33,25 +32,21 @@ char char_map[] =
   '\0','\0'
 };
 
-unsigned char key_state[NUM_KEYS] = {0};
-extern struct list_head blocked; // lista de procesos bloqueados
-
 int zeos_ticks = 0;
+
+void screen_routine() {
+  if (current()->PID >= 0 && current()->screen_page) {     
+    Word *vram = (Word *) 0xB8000;             
+    Word *buf  = (Word *) current()->screen_page;    
+    for (int i = 0; i < 2000; ++i) vram[i] = buf[i];
+  }
+}
 
 void clock_routine() {
   zeos_show_clock();
   zeos_ticks++;
-    struct task_struct *cur = current();
-    if (cur->screen_frame != -1) {
-        // Dirección física del marco:
-        char *src = FRAME2ADDR(cur->screen_frame);
-        char *dst = (char *) 0xB8000;  // Buffer de texto VGA
-        // Copiar 80x25 caracteres (2 bytes c/u = 4000 bytes):contentReference[oaicite:6]{index=6}:
-        for (int i = 0; i < 80*25*2; i++) {
-            dst[i] = src[i];
-        }
-    }
-    schedule();
+
+  screen_routine(); // Actualiza la pantalla del proceso actual
   schedule();
 }
 

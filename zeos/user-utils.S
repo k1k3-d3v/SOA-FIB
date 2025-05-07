@@ -124,10 +124,13 @@ ENTRY(pause)
 
 ENTRY(StartScreen)
     pushl %ebp
-    movl  %esp, %ebp
-    movl  $5, %eax          # nº de syscall (debe coincidir con la tabla del kernel)
-    call  syscall_sysenter  # macro ya definida
-    test  %eax, %eax        # ¿error?   (eax == -1 → CF=1, SF=1)
-    js     nok              # reutiliza la etiqueta de error que ya existe
+    movl  %esp,%ebp
+    pushl %ebx 
+    movl  $38,%eax
+    call  syscall_sysenter
+    popl  %ebx
+    test  %eax,%eax
+    js    nok
     popl  %ebp
     ret
+

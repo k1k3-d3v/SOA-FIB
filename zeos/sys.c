@@ -150,6 +150,11 @@ int sys_fork(void)
   /* Queue child process into readyqueue */
   uchild->task.state=ST_READY;
   list_add_tail(&(uchild->task.list), &readyqueue);
+
+  unsigned int screen_parent_frame = get_frame(parent_PT, (unsigned)current()->screen_page >> 12);
+  unsigned int child_log_page = PAG_LOG_INIT_DATA + NUM_PAG_DATA;
+  set_ss_pag(process_PT, child_log_page, screen_parent_frame);
+  uchild->task.screen_page = (void *)(child_log_page << 12);
   
   return uchild->task.PID;
 }
@@ -270,24 +275,18 @@ int sys_pause(int ms)
     return 0;
 }
 
-#define PAG_LOG_SCREEN   (PAG_LOG_INIT_DATA + NUM_PAG_DATA)   /* página virtual libre */
-#define USER_VA_SCREEN   (PAG_LOG_SCREEN << 12)               /* dirección lógica   */
-
 void *sys_StartScreen(void)
 {
-    struct task_struct *p = current();        /* PCB del proceso en curso   */
-    if (p->screen_frame != -1)                /* ya tiene página de pantalla*/
-        return (void*)-1;
+  page_table_entry *process_PT = get_PT(current());
+  int new_frame = alloc_frame();
 
-    int frame = alloc_frame();                /* ← aquí va el código citado */
-    if (frame < 0) return (void*)-1;          /* sin memoria física libre   */
+  if (new_frame != -1) {
+    set_ss_pag(process_PT, PAG_LOG_INIT_DATA + NUM_PAG_DATA, new_frame);
+    current()->screen_page = (void *)((PAG_LOG_INIT_DATA + NUM_PAG_DATA) << 12);
+  } 
+  else {
+    return (void*) -EINVAL;
+  }
 
-    p->screen_frame = frame;                  /* guarda el nº de frame      */
-
-    /* mapea la página en el PT del proceso */
-    page_table_entry *PT = get_PT(p);
-    set_ss_pag(PT, PAG_LOG_SCREEN, frame);
-    set_cr3(get_DIR(p));                      /* flush TLB                  */
-
-    return (void*)USER_VA_SCREEN;             /* dirección que verá el user */
+  return (void*)(current()->screen_page);
 }
