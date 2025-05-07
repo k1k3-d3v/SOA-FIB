@@ -59,8 +59,6 @@ void M1_test() {
 void M2_test() {
     unsigned short* display = (unsigned short*) StartScreen();
 
-    fork();
-
     if (display != (void*) -1) {
         // Limpiamos la pantalla
         for (int i = 0; i < 2000; ++i) {

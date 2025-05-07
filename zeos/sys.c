@@ -151,11 +151,18 @@ int sys_fork(void)
   uchild->task.state=ST_READY;
   list_add_tail(&(uchild->task.list), &readyqueue);
 
-  unsigned int screen_parent_frame = get_frame(parent_PT, (unsigned)current()->screen_page >> 12);
-  unsigned int child_log_page = PAG_LOG_INIT_DATA + NUM_PAG_DATA;
-  set_ss_pag(process_PT, child_log_page, screen_parent_frame);
-  uchild->task.screen_page = (void *)(child_log_page << 12);
-  
+  /* Copiar página de pantalla si existe */
+  if (current()->screen_page != NULL) {
+    unsigned int child_log_page = PAG_LOG_INIT_DATA + NUM_PAG_DATA;
+    unsigned int new_frame = alloc_frame();
+    
+    set_ss_pag(parent_PT, child_log_page, new_frame);
+    copy_data((void *)((unsigned)current()->screen_page), (void *)(child_log_page << 12), PAGE_SIZE);
+    set_ss_pag(parent_PT, child_log_page, 0); // desmonta la página del padre
+    set_ss_pag(process_PT, child_log_page, new_frame);
+    uchild->task.screen_page = (void *)(child_log_page << 12);
+  }
+
   return uchild->task.PID;
 }
 
