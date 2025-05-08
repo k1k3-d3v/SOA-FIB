@@ -77,6 +77,7 @@ void M2_test() {
     else {
         perror("Error en M2");
     }
+    //fork();
 }
 
 int __attribute__((__section__(".text.main")))

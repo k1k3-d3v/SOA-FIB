@@ -105,9 +105,18 @@ int sys_fork(void)
       return -EAGAIN; 
     }
   }
-
+  
   /* Copy parent's SYSTEM and CODE to child. */
   page_table_entry *parent_PT = get_PT(current());
+
+  int pag_start = first_free_space(parent_PT, PAG_LOG_INIT_DATA+NUM_PAG_DATA, NUM_PAG_DATA);
+  
+  if (pag_start < 0) {
+    /* Devolvemos el task_struct al freequeue y abortamos */
+    list_add_tail(lhcurrent, &freequeue);
+    return -EAGAIN;
+  }
+
   for (pag=0; pag<NUM_PAG_KERNEL; pag++)
   {
     set_ss_pag(process_PT, pag, get_frame(parent_PT, pag));
@@ -117,12 +126,21 @@ int sys_fork(void)
     set_ss_pag(process_PT, PAG_LOG_INIT_CODE+pag, get_frame(parent_PT, PAG_LOG_INIT_CODE+pag));
   }
   /* Copy parent's DATA to child. We will use TOTAL_PAGES-1 as a temp logical page to map to */
-  for (pag=NUM_PAG_KERNEL+NUM_PAG_CODE; pag<NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; pag++)
+  for (pag = NUM_PAG_KERNEL + NUM_PAG_CODE; pag < NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; ++pag)
   {
-    /* Map one child page to parent's address space. */
-    set_ss_pag(parent_PT, pag+NUM_PAG_DATA, get_frame(process_PT, pag));
-    copy_data((void*)(pag<<12), (void*)((pag+NUM_PAG_DATA)<<12), PAGE_SIZE);
-    del_ss_pag(parent_PT, pag+NUM_PAG_DATA);
+    /* Página lógica scratch dentro del bloque contiguo */
+    int dest_pag = pag_start + (pag - (NUM_PAG_KERNEL + NUM_PAG_CODE));
+
+    /* Mapear la página física del hijo en el espacio lógico del padre */
+    set_ss_pag(parent_PT, dest_pag, get_frame(process_PT, pag));
+
+    /* Copiar una página completa: padre → scratch */
+    copy_data((void *)(pag << 12),           /* origen  */
+              (void *)(dest_pag << 12),      /* destino */
+              PAGE_SIZE);
+
+    /* Desmontar la página scratch */
+    del_ss_pag(parent_PT, dest_pag);
   }
   /* Deny access to the child's memory space */
   set_cr3(get_DIR(current()));
@@ -151,19 +169,30 @@ int sys_fork(void)
   uchild->task.state=ST_READY;
   list_add_tail(&(uchild->task.list), &readyqueue);
 
-  /* Copiar página de pantalla si existe */
-  if (current()->screen_page != NULL) {
-    unsigned int child_log_page = PAG_LOG_INIT_DATA + NUM_PAG_DATA;
-    unsigned int new_frame = alloc_frame();
-    
-    set_ss_pag(parent_PT, child_log_page, new_frame);
-    copy_data((void *)((unsigned)current()->screen_page), (void *)(child_log_page << 12), PAGE_SIZE);
-    set_ss_pag(parent_PT, child_log_page, 0); // desmonta la página del padre
-    set_ss_pag(process_PT, child_log_page, new_frame);
-    uchild->task.screen_page = (void *)(child_log_page << 12);
-  }
+  unsigned int screen_parent_frame = get_frame(parent_PT, (unsigned)current()->screen_page >> 12);
+  unsigned int child_log_page = PAG_LOG_INIT_DATA + NUM_PAG_DATA;
+  set_ss_pag(process_PT, child_log_page, screen_parent_frame);
+  uchild->task.screen_page = (void *)(child_log_page << 12);
 
   return uchild->task.PID;
+}
+
+int first_free_space(page_table_entry *PT, int from, int pages_needed) {
+  if (pages_needed <= 0) return -1;
+
+  for (int i = from; i <= TOTAL_PAGES - pages_needed; ++i){
+    int j;
+    for (j = 0; j < pages_needed; ++j) {
+      if (PT[i + j].entry != 0) {
+        i += j;
+        break;
+      }
+    }
+    if (j == pages_needed) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 #define TAM_BUFFER 512
